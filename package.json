@@ -1,0 +1,39 @@
+{
+  "name": "@coinify/rabbitmq",
+  "version": "1.0.0",
+  "description": "Coinify RabbitMQ client with support for events and tasks",
+  "main": "./index.js",
+  "author": {
+    "name": "Jesper Borgstrup"
+  },
+  "scripts": {
+    "test": "NODE_ENV=${NODE_ENV:-localTest} mocha --recursive test/bootstrap.test.js ./test",
+    "lint": "eslint --color .",
+    "lint-fix": "eslint --fix .",
+    "build": "npm i && npm run lint && npm test"
+  },
+  "dependencies": {
+    "amqplib": "^0.5.2",
+    "backoff": "^2.5.0",
+    "console-log-level": "^1.4.0",
+    "lodash": "^4.17.4",
+    "uuid": "^3.1.0"
+  },
+  "devDependencies": {
+    "@coinify/eslint-config-coinify": "^1.1.5",
+    "chai": "^4.1.2",
+    "chai-as-promised": "^7.1.1",
+    "chai-subset": "^1.6.0",
+    "cli": "^1.0.1",
+    "eslint": "^3.3.1",
+    "eslint-plugin-mocha": "^4.7.0",
+    "mocha": "^3.5.3",
+    "rewire": "^2.5.2",
+    "sinon": "^3.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:CoinifySoftware/node-rabbitmq.git"
+  },
+  "license": "UNLICENSED"
+}

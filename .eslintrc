@@ -1,0 +1,6 @@
+{
+  "extends": "@coinify/eslint-config-coinify",
+  "parserOptions": {
+    "sourceType": "module"
+  }
+}

@@ -1,4 +1,5 @@
-# coinify-rabbitmq v1.0
+# node-rabbitmq v1.0
+[![npm version](https://badge.fury.io/js/%40coinify%2Frabbitmq.svg)](https://badge.fury.io/js/%40coinify%2Frabbitmq)
 
 ## Suggestions for improvement
 * Ping functionality for service health check
@@ -17,7 +18,7 @@ will be used between re-connection failures: 1, 1, 2, 3, 5, 10, 20, 30, 50, 60, 
 
 ## `CoinifyRabbit` API
 ```js
-const CoinifyRabbit = require('@coinify/coinify-rabbitmq');
+const CoinifyRabbit = require('@coinify/rabbitmq');
 ```
 
 ### `new CoinifyRabbit(options)`
@@ -85,7 +86,7 @@ Emitting an event with name `eventName` and context `context` publishes the foll
 ### Example
 
 ```js
-const CoinifyRabbit = require('@coinify/coinify-rabbitmq');
+const CoinifyRabbit = require('@coinify/rabbitmq');
 
 const coinifyRabbit = new CoinifyRabbit({service: {name: 'my-service'}});
 
@@ -198,7 +199,7 @@ Enqueueing a task with name `taskName` and context `context` publishes the follo
 ### Example
 
 ```js
-const CoinifyRabbit = require('@coinify/coinify-rabbitmq');
+const CoinifyRabbit = require('@coinify/rabbitmq');
 
 const coinifyRabbit = new CoinifyRabbit({service: {name: 'my-service'}});
 

@@ -1,6 +1,6 @@
 {
   "name": "@coinify/rabbitmq",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Coinify RabbitMQ client with support for events and tasks",
   "main": "./index.js",
   "author": {
@@ -25,11 +25,11 @@
     "chai-as-promised": "^7.1.1",
     "chai-subset": "^1.6.0",
     "cli": "^1.0.1",
-    "eslint": "^3.3.1",
+    "eslint": "^4.12.1",
     "eslint-plugin-mocha": "^4.7.0",
-    "mocha": "^3.5.3",
-    "rewire": "^2.5.2",
-    "sinon": "^3.3.0"
+    "mocha": "^4.0.1",
+    "rewire": "^3.0.2",
+    "sinon": "^4.1.2"
   },
   "repository": {
     "type": "git",

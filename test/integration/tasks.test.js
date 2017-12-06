@@ -138,7 +138,7 @@ describe('Integration tests', () => {
           const elapsed = endTime - startTime;
           startTime = endTime;
 
-           // Check the delay timing (not for first attempt, which should be immediate)
+          // Check the delay timing (not for first attempt, which should be immediate)
           if (attempt > 0) {
             expect(elapsed).to.be.at.least(delayMillis);
             // Allow 200 ms for error

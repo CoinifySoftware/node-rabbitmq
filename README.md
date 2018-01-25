@@ -315,3 +315,26 @@ up prefetch values.
 
 See (Consumer prefetch)[https://www.rabbitmq.com/consumer-prefetch.html] and (Confirms)[https://www.rabbitmq.com/confirms.html]
 for more information.
+
+## Failed Messages
+As described in the retry, all failed messages will end up in the `_failed` queue. We can then consume then and manually re-enqueue the messages we want to retry by using the functions below.
+
+### `#consumeFailedEvents()`
+
+### `#enqueueMessage(queue, message)`
+
+_Enqueues a message to a specific queue._
+
+```js
+// Can be of type event message or task message
+const message = {
+  eventName: fullEventName, // serviceName + '.' + eventName
+  context: context,
+  uuid: 'd51bbaed-1ee8-4bb6-a739-cee5b56ee518', // Actual UUID generated upon emit
+  time: 1504865878534 // Timestamp of event, in milliseconds since UNIX epoc
+}
+
+const result = await coinifyRabbit.enqueueMessage('events.accounting.trade.trade-completed', message);
+
+// result is true if message was enqueued correctly.
+```

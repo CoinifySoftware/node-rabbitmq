@@ -5,13 +5,14 @@ const CoinifyRabbit = require('../../lib/CoinifyRabbit');
 describe('Integration tests', () => {
   describe('Failed', () => {
 
-    let rabbit;
-    let taskName, fullTaskName, eventName, fullEventName;
-    const serviceName = 'my-test-service';
-
-    const context = {myContext: false};
-    const enqueueTaskOptions = {exchange: {autoDelete: true}};
-
+    let rabbit, taskName, fullTaskName, eventName, fullEventName;
+    const serviceName = 'my-test-service',
+      enqueueOptions = {exchange: {autoDelete: true}},
+      consumerOptions = {exchange: {autoDelete: true}, queue: {autoDelete: true}, retry: {maxAttempts: 0}},
+      failedMessageConsumerOptions = {exchange: {autoDelete: true}, queue: {autoDelete: true}},
+      eventContext = {myEventContext: false},
+      taskContext = {myTaskContext: false},
+      failingFn = async () => { throw new Error('event processing function rejected'); };
 
     beforeEach(async() => {
       rabbit = new CoinifyRabbit({service: {name: serviceName}});
@@ -25,23 +26,13 @@ describe('Integration tests', () => {
       await rabbit.shutdown();
     });
 
-    it('should be able to consume any type of failed message', async () => {
+    it('should be able to consume any type of failed message in a failed message consumer', async () => {
       return new Promise(async (resolve) => {
         let eventConsumed = false,
           taskConsumed = false;
-        const enqueueOptions = {exchange: {autoDelete: true}},
-          consumerOptions = {exchange: {autoDelete: true}, queue: {autoDelete: true}, retry: {maxAttempts: 0}},
-          failedMessageConsumerOptions = {exchange: {autoDelete: true}, queue: {autoDelete: true}},
-          eventContext = {myEventContext: false},
-          taskContext = {myTaskContext: false};
 
-        await rabbit.registerTaskConsumer(taskName, async (c, t) => {
-          throw new Error('Task processing function rejected');
-        }, consumerOptions);
-        await rabbit.registerEventConsumer(fullEventName, async (c, e) => {
-          throw new Error('event processing function rejected');
-        }, consumerOptions);
-
+        await rabbit.registerTaskConsumer(taskName, failingFn, consumerOptions);
+        await rabbit.registerEventConsumer(fullEventName, failingFn, consumerOptions);
         await rabbit.registerFailedMessageConsumer(async (c, t) => {
           if (t.taskName){
             expect(t.taskName).to.equal(fullTaskName);

@@ -4,6 +4,8 @@
 ## Suggestions for improvement
 * Ping functionality for service health check
 * CLI scripts to emit events / enqueue tasks
+* Split main lib code into smaller files
+
 
 ## Implementation details
 * Everything happens on the same TCP connection to RabbitMQ. It is created first time it is needed, and cached for subsequent requests.

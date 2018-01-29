@@ -321,7 +321,7 @@ As described in the retry, all failed messages will end up in the `_failed` queu
 
 ### `#consumeFailedEvents()`
 
-### `#enqueueMessage(routingKey, messageObject)`
+### `#enqueueMessage(queueName, messageObject)`
 
 _Enqueues a message to a specific queue._
 

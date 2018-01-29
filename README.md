@@ -4,6 +4,8 @@
 ## Suggestions for improvement
 * Ping functionality for service health check
 * CLI scripts to emit events / enqueue tasks
+* Split main lib code into smaller files
+
 
 ## Implementation details
 * Everything happens on the same TCP connection to RabbitMQ. It is created first time it is needed, and cached for subsequent requests.
@@ -319,7 +321,26 @@ for more information.
 ## Failed Messages
 As described in the retry, all failed messages will end up in the `_failed` queue. We can then consume then and manually re-enqueue the messages we want to retry by using the functions below.
 
-### `#consumeFailedEvents()`
+### `#registerFailedMessageConsumer(consumeFn, options={})`
+
+_Registers a function for consuming a task or event from the queue of failed jobs_
+```js
+const consumerTag = await coinifyRabbit.registerFailedMessageConsumer(async(context, message) => {
+  // Resolve to ACK task, removing it from the queue
+  // Reject and task will not be ACK'ed
+
+  // context is the same as enqueued context object
+  // message is object of {messageName, uuid, time}
+  console.log({context, message});
+});
+```
+
+`#registerFailedMessageConsumer` bears resemblance to `#registerTaskConsumer` and `#registerEventConsumer`, however it will not need to match to any (event or task) name.
+
+The following properties can be set in `options`:
+
+* `consumer`: Consumer-specific options. Must be an object with the following properties:
+  * `prefetch`: Prefetch value for this consumer. See _Prefetch_ section for more information.
 
 ### `#enqueueMessage(queueName, messageObject)`
 

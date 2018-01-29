@@ -9,6 +9,7 @@ describe('Integration tests', () => {
     const serviceName = 'my-test-service',
       enqueueOptions = {exchange: {autoDelete: true}},
       consumerOptions = {exchange: {autoDelete: true}, queue: {autoDelete: true}, retry: {maxAttempts: 0}},
+      enqueueMessageOptions = {exchange: {autoDelete: true}},
       failedMessageConsumerOptions = {exchange: {autoDelete: true}, queue: {autoDelete: true}},
       eventContext = {myEventContext: false},
       taskContext = {myTaskContext: false},
@@ -33,17 +34,17 @@ describe('Integration tests', () => {
 
         await rabbit.registerTaskConsumer(taskName, failingFn, consumerOptions);
         await rabbit.registerEventConsumer(fullEventName, failingFn, consumerOptions);
-        await rabbit.registerFailedMessageConsumer(async (c, t) => {
-          if (t.taskName){
-            expect(t.taskName).to.equal(fullTaskName);
-            expect(t.attempts).to.deep.equal(1);
-            expect(c).to.deep.equal(taskContext);
+        await rabbit.registerFailedMessageConsumer(async (q, m) => {
+          if (m.taskName){
+            expect(m.taskName).to.equal(fullTaskName);
+            expect(m.attempts).to.deep.equal(1);
+            expect(m.context).to.deep.equal(taskContext);
             taskConsumed = true;  
           }
-          if (t.eventName){
-            expect(t.eventName).to.equal(fullEventName);
-            expect(t.attempts).to.deep.equal(1);
-            expect(c).to.deep.equal(eventContext);
+          if (m.eventName){
+            expect(m.eventName).to.equal(fullEventName);
+            expect(m.attempts).to.deep.equal(1);
+            expect(m.context).to.deep.equal(eventContext);
             eventConsumed = true;  
           }
 
@@ -54,6 +55,28 @@ describe('Integration tests', () => {
         }, failedMessageConsumerOptions);
         await rabbit.enqueueTask(fullTaskName, taskContext, enqueueOptions);
         await rabbit.emitEvent(eventName, eventContext, enqueueOptions);
+      });
+    });
+
+    it('should be able to reenqueue a failed message', async () => {
+      return new Promise(async (resolve) => {
+        let punishMeDaddy = true;
+        const fn = async (c, m) => {
+          if (punishMeDaddy){
+            throw new Error('message processing function rejected'); 
+          } else {
+            expect(m.taskName).to.equal(fullTaskName);
+            expect(m.context).to.deep.equal(taskContext);
+            expect(m.attempts).to.equal(1);
+            resolve();
+          }
+        };
+        await rabbit.registerTaskConsumer(taskName, fn, consumerOptions);
+        await rabbit.registerFailedMessageConsumer(async (q, m) => {
+          punishMeDaddy = false;
+          rabbit.enqueueMessage(q, m, enqueueMessageOptions);
+        }, failedMessageConsumerOptions);
+        await rabbit.enqueueTask(fullTaskName, taskContext, enqueueOptions);
       });
     });
   });

@@ -325,12 +325,12 @@ As described in the section about retry, all failed messages will end up in the 
 
 _Registers a function for consuming a task or event from the queue of failed messages_
 ```js
-const consumerTag = await coinifyRabbit.registerFailedMessageConsumer(async(context, message) => {
+const consumerTag = await coinifyRabbit.registerFailedMessageConsumer(async(routingKey, message) => {
   // Resolve to ACK task, removing it from the queue
-  // Reject and task will not be ACK'ed
+  // Reject and task will bet NACK'ed and re-enqueued
 
-  // context is the same as enqueued context object
-  // message is object of {messageName, uuid, time}
+  // routingKey is the name of the queue that the message was failed from
+  // message is object of {eventName|taskName, context, uuid, time, attempts}
   console.log({context, message});
 });
 ```
@@ -357,4 +357,24 @@ const messageObject = {
 const result = await coinifyRabbit.enqueueMessage('events.accounting.trade.trade-completed', messageObject);
 
 // result is true if message was enqueued correctly.
+```
+
+### Failed Message Handling
+
+It is possible to setup and use `#registerFailedMessageConsumer` and `#enqueueMessage` for handling failed message and evaluating them for re-enqueueing:
+
+```js
+const consumerTag = await coinifyRabbit.registerFailedMessageConsumer(async(routingKey, message) => {
+  // Logic for determining whether the failed message
+  // should be re-enqueued or if other action should be taken.
+
+  // If it wishes to re-enqueue do:
+  const result = await coinifyRabbit.enqueueMessage(routingKey, message);
+});
+```
+
+Alternatively, if one is in a scenario where all failed messages should be re-enqueued right away, it can be done as:
+
+```js
+const consumerTag = await coinifyRabbit.registerFailedMessageConsumer(coinifyRabbit.enqueueMessage(routingKey, message));
 ```

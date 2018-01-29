@@ -11,6 +11,7 @@ describe('CoinifyRabbit', () => {
     let _getChannelStub,
       consumeFnStub,
       channelAckStub,
+      channelNackStub,
       _handleConsumeRejectionStub,
 
       rabbit;
@@ -37,35 +38,38 @@ describe('CoinifyRabbit', () => {
       };
 
       channelAckStub = sinon.stub();
+      channelNackStub = sinon.stub();
       consumeFnStub = sinon.stub();
       _getChannelStub = sinon.stub(rabbit, '_getChannel');
-      _getChannelStub.resolves({ack: channelAckStub});
+      _getChannelStub.resolves({ack: channelAckStub, nack: channelNackStub});
     });
 
     afterEach(() => {
       _getChannelStub.restore();
     });
 
-    it('should call consumeFn, ack, and return if consumeFn resolves', async () => {
+    it('should call consumeFn and ack if consumeFn resolves', async () => {
       consumeFnStub.resolves();
       channelAckStub.resolves();
-
-      expect(await rabbit._handleFailedMessage(message, options, consumeFnStub)).to.equal(true);
+      await rabbit._handleFailedMessage(message, options, consumeFnStub);
       expect(consumeFnStub.calledOnce).to.equal(true);
       expect(consumeFnStub.firstCall.args).to.deep.equal([task.context, task]);
       expect(channelAckStub.calledOnce).to.equal(true);
       expect(channelAckStub.firstCall.args).to.deep.equal([message]);
+      expect(channelNackStub.notCalled).to.equal(true);
     });
 
-    it('should call consumeFn and do nothing if consumeFn rejects', async () => {
+    it('should call consumeFn and nack if consumeFn rejects', async () => {
       const consumeError = new Error('Consumption rejection');
       consumeFnStub.rejects(consumeError);
       channelAckStub.resolves();
-      await rabbit._handleFailedMessage(message, options, consumeFnStub);
 
+      await rabbit._handleFailedMessage(message, options, consumeFnStub);
       expect(consumeFnStub.calledOnce).to.equal(true);
       expect(consumeFnStub.firstCall.args).to.deep.equal([task.context, task]);
       expect(channelAckStub.notCalled).to.equal(true);
+      expect(channelNackStub.calledOnce).to.equal(true);
+      expect(channelNackStub.firstCall.args).to.deep.equal([message]);
     });
 
     it('should call onCancel option function if message is null', async () => {
@@ -77,6 +81,7 @@ describe('CoinifyRabbit', () => {
       expect(options.onCancel.calledOnce).to.equal(true);
       expect(consumeFnStub.notCalled).to.equal(true);
       expect(channelAckStub.notCalled).to.equal(true);
+      expect(channelNackStub.notCalled).to.equal(true);
     });
   });
 });

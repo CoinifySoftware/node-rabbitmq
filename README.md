@@ -319,11 +319,11 @@ See (Consumer prefetch)[https://www.rabbitmq.com/consumer-prefetch.html] and (Co
 for more information.
 
 ## Failed Messages
-As described in the retry, all failed messages will end up in the `_failed` queue. We can then consume then and manually re-enqueue the messages we want to retry by using the functions below.
+As described in the section about retry, all failed messages will end up in the `_failed` queue. We can then consume them and manually re-enqueue the messages to a specified queue we want to retry by using the functions below.
 
 ### `#registerFailedMessageConsumer(consumeFn, options={})`
 
-_Registers a function for consuming a task or event from the queue of failed jobs_
+_Registers a function for consuming a task or event from the queue of failed messages_
 ```js
 const consumerTag = await coinifyRabbit.registerFailedMessageConsumer(async(context, message) => {
   // Resolve to ACK task, removing it from the queue
@@ -344,10 +344,9 @@ The following properties can be set in `options`:
 
 ### `#enqueueMessage(queueName, messageObject)`
 
-_Enqueues a message to a specific queue._
+_Enqueues a message to a specific queue. This can be of type [event](#event-message) or [task](#task-message) message_
 
 ```js
-// Can be of type event message or task message
 const messageObject = {
   eventName: fullEventName, // serviceName + '.' + eventName
   context: context,

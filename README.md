@@ -342,7 +342,7 @@ The following properties can be set in `options`:
 * `consumer`: Consumer-specific options. Must be an object with the following properties:
   * `prefetch`: Prefetch value for this consumer. See _Prefetch_ section for more information.
 
-### `#enqueueMessage(routingKey, messageObject)`
+### `#enqueueMessage(queueName, messageObject)`
 
 _Enqueues a message to a specific queue._
 

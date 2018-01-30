@@ -31,7 +31,8 @@ describe('CoinifyRabbit', () => {
         time: 1122334455
       };
       message = {
-        content: JSON.stringify(task)
+        content: JSON.stringify(task),
+        fields: {routingKey: 'path-to-message-queue'}
       };
       options = {
         theOptions: true
@@ -53,7 +54,7 @@ describe('CoinifyRabbit', () => {
       channelAckStub.resolves();
       await rabbit._handleFailedMessage(message, options, consumeFnStub);
       expect(consumeFnStub.calledOnce).to.equal(true);
-      expect(consumeFnStub.firstCall.args).to.deep.equal([task.context, task]);
+      expect(consumeFnStub.firstCall.args).to.deep.equal([message.fields.routingKey, task]);
       expect(channelAckStub.calledOnce).to.equal(true);
       expect(channelAckStub.firstCall.args).to.deep.equal([message]);
       expect(channelNackStub.notCalled).to.equal(true);
@@ -66,7 +67,7 @@ describe('CoinifyRabbit', () => {
 
       await rabbit._handleFailedMessage(message, options, consumeFnStub);
       expect(consumeFnStub.calledOnce).to.equal(true);
-      expect(consumeFnStub.firstCall.args).to.deep.equal([task.context, task]);
+      expect(consumeFnStub.firstCall.args).to.deep.equal([message.fields.routingKey, task]);
       expect(channelAckStub.notCalled).to.equal(true);
       expect(channelNackStub.calledOnce).to.equal(true);
       expect(channelNackStub.firstCall.args).to.deep.equal([message]);

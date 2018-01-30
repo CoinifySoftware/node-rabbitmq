@@ -376,5 +376,5 @@ const consumerTag = await coinifyRabbit.registerFailedMessageConsumer(async(rout
 Alternatively, if one is in a scenario where all failed messages should be re-enqueued right away, it can be done as:
 
 ```js
-const consumerTag = await coinifyRabbit.registerFailedMessageConsumer(coinifyRabbit.enqueueMessage(routingKey, message));
+const consumerTag = await coinifyRabbit.registerFailedMessageConsumer(async (routingKey, message) => coinifyRabbit.enqueueMessage(routingKey, message));
 ```

@@ -93,7 +93,7 @@ const CoinifyRabbit = require('@coinify/rabbitmq');
 const coinifyRabbit = new CoinifyRabbit({service: {name: 'my-service'}});
 
 async function testEvent() {
-    await coinifyRabbit.registerEventConsumer('my-service.my-event', {}, async (context, event) => {
+    await coinifyRabbit.registerEventConsumer('my-service.my-event', async (context, event) => {
       const {eventName, uuid, time} = event;
       console.log('Event consumed', {context, eventName, uuid, time});
       process.exit(0);
@@ -109,7 +109,7 @@ testEvent();
 _Emits an event with an associated context_
 
 ```js
-const result = await coinifyRabbit.emitEvent('my-event', options, {myContext: true});
+const result = await coinifyRabbit.emitEvent('my-event', {myContext: true});
 
 // result is an object with the below keys
 const {eventName, context, uuid, time} = result;

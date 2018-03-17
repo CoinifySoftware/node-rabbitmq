@@ -7,7 +7,7 @@
     "name": "Jesper Borgstrup"
   },
   "scripts": {
-    "test": "NODE_ENV=${NODE_ENV:-localTest} mocha --recursive test/bootstrap.test.js ./test",
+    "test": "NODE_ENV=${NODE_ENV:-localTest} mocha --recursive --exit test/bootstrap.test.js ./test",
     "lint": "eslint --color .",
     "lint-fix": "eslint --fix .",
     "build": "npm i && npm run lint && npm test"

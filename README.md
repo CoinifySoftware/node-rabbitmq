@@ -1,4 +1,4 @@
-# node-rabbitmq v1.0
+# node-rabbitmq 
 [![npm version](https://badge.fury.io/js/%40coinify%2Frabbitmq.svg)](https://badge.fury.io/js/%40coinify%2Frabbitmq)
 
 ## Suggestions for improvement

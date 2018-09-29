@@ -16,7 +16,7 @@
     "amqplib": "^0.5.2",
     "backoff": "^2.5.0",
     "console-log-level": "^1.4.0",
-    "lodash": "^4.17.4",
+    "lodash": "^4.17.5",
     "uuid": "^3.1.0"
   },
   "devDependencies": {

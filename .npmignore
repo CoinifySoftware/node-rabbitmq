@@ -1,1 +1,4 @@
 test
+.vscode
+.idea
+config.local.js

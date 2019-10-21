@@ -14,10 +14,10 @@
     "build": "npm i && npm run lint && npm test"
   },
   "dependencies": {
-    "amqplib": "^0.5.3",
+    "amqplib": "^0.5.5",
     "backoff": "^2.5.0",
     "console-log-level": "^1.4.0",
-    "lodash": "^4.17.5",
+    "lodash": "^4.17.15",
     "uuid": "^3.1.0"
   },
   "devDependencies": {

@@ -136,6 +136,9 @@ const consumerTag = await coinifyRabbit.registerEventConsumer('my-service.my-eve
 The following properties can be set in  `options`:
 
 * `retry`: Configure retry mechanism for this consumer. See _Retry_ section for more information
+* `uniqueQueue`: Create a unique queue (`true`) instead of default
+behaviour (`false`) where each instance of the service consumes from the same queue.
+Setting this to `true` will cause the event to be consumed by _each_ event consumer.
 * `consumer`: Consumer-specific options. Must be an object with the following properties:
   * `prefetch`: Prefetch value for this consumer. See _Prefetch_ section for more information.
 * `service`: Service-specific options. Must be an object with the following properties:
@@ -258,6 +261,9 @@ The given `taskName` will be prefixed with `'<serviceName>.'` to produce a full 
 The following properties can be set in  `options`:
 
 * `retry`: Configure retry mechanism for this consumer. See _Retry_ section for more information
+* `uniqueQueue`: Create a unique queue (`true`) instead of default
+behaviour (`false`) where each instance of the service consumes from the same queue.
+Setting this to `true` will cause the event to be consumed by _each_ event consumer.
 * `consumer`: Consumer-specific options. Must be an object with the following properties:
   * `prefetch`: Prefetch value for this consumer. See _Prefetch_ section for more information.
 * `service`: Service-specific options. Must be an object with the following properties:

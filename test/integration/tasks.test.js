@@ -119,6 +119,46 @@ describe('Integration tests', () => {
       });
     });
 
+    it('should be able to consume the same task in all instances of the same service', async () => {
+      const consumerCount = 3;
+
+      const consumerIds = _.range(consumerCount);
+      // List of IDs of tasks consumed by all consumers
+      let tasksConsumed = 0;
+      // Number of tasks consumed by each consumer
+      const tasksConsumedByConsumer = {};
+
+      return new Promise(async (resolve) => {
+        for (const i of consumerIds) {
+          const consumeOptions = _.defaultsDeep({}, registerTaskConsumerOptions, { uniqueQueue: true });
+          await rabbit.registerTaskConsumer(taskName, (c, e) => { // eslint-disable-line no-loop-func
+            expect(e.taskName).to.equal(fullTaskName);
+
+            tasksConsumed++;
+            if (!tasksConsumedByConsumer[i]) {
+              tasksConsumedByConsumer[i] = 0;
+            }
+            tasksConsumedByConsumer[i]++;
+
+            // If all tasks have now been consumed by all consumers
+            if (tasksConsumed === consumerCount) {
+              // All consumers have consumed something
+              expect(_.size(tasksConsumedByConsumer)).to.equal(consumerCount);
+
+              // Check that each consumer has consumed the task
+              _.forOwn(tasksConsumedByConsumer, tasksConsumed => {
+                expect(tasksConsumed).to.equal(1);
+              });
+
+              resolve();
+            }
+          }, consumeOptions);
+        }
+
+        await rabbit.enqueueTask(fullTaskName, { theContext: true }, enqueueTaskOptions);
+      });
+    });
+
     it('should retry a task whose processing function rejected', async () => {
       return new Promise(async (resolve) => {
 

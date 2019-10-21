@@ -169,6 +169,46 @@ describe('Integration tests', () => {
       });
     });
 
+    it('should be able to consume the same event in all instances of the same service', async () => {
+      const consumerCount = 3;
+
+      const consumerIds = _.range(consumerCount);
+      // List of IDs of events consumed by all consumers
+      let eventsConsumed = 0;
+      // Number of events consumed by each consumer
+      const eventsConsumedByConsumer = {};
+
+      return new Promise(async (resolve) => {
+        for (const i of consumerIds) {
+          const consumeOptions = _.defaultsDeep({}, registerEventConsumerOptions, { service: { name: 'my-service' }, uniqueQueue: true });
+          await rabbit.registerEventConsumer(fullEventName, (c, e) => { // eslint-disable-line no-loop-func
+            expect(e.eventName).to.equal(fullEventName);
+
+            eventsConsumed++;
+            if (!eventsConsumedByConsumer[i]) {
+              eventsConsumedByConsumer[i] = 0;
+            }
+            eventsConsumedByConsumer[i]++;
+
+            // If all events have now been consumed by all consumers
+            if (eventsConsumed === consumerCount) {
+              // All consumers have consumed something
+              expect(_.size(eventsConsumedByConsumer)).to.equal(consumerCount);
+
+              // Check that each consumer has consumed the event
+              _.forOwn(eventsConsumedByConsumer, eventsConsumed => {
+                expect(eventsConsumed).to.equal(1);
+              });
+
+              resolve();
+            }
+          }, consumeOptions);
+        }
+
+        await rabbit.emitEvent(eventName, { theContext: true }, emitEventOptions);
+      });
+    });
+
     it('should be able to specify events to consume using wildcards', async () => {
       /*
        * 4 consumers:

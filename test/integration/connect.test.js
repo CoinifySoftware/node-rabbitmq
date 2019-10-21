@@ -8,13 +8,13 @@ describe('Integration tests', () => {
     let taskName, fullTaskName;
     const serviceName = 'my-test-service';
 
-    const enqueueOptions = {exchange: {autoDelete: true}};
-    const consumeOptions = {exchange: {autoDelete: true}, queue: {autoDelete: true}};
+    const enqueueOptions = { exchange: { autoDelete: true } };
+    const consumeOptions = { exchange: { autoDelete: true }, queue: { autoDelete: true } };
 
     let rabbit;
 
     beforeEach(() => {
-      rabbit = new CoinifyRabbit({service: {name: serviceName}});
+      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
       taskName = 'my-task' + Math.random();
       fullTaskName = serviceName + '.' + taskName;
     });
@@ -28,8 +28,8 @@ describe('Integration tests', () => {
         let eventConsumed = false;
         let taskConsumed = false;
 
-        const eventContext = {eventContext: true};
-        const taskContext = {taskContext: true};
+        const eventContext = { eventContext: true };
+        const taskContext = { taskContext: true };
 
         const _consumed = async () => {
           if (eventConsumed && taskConsumed) {

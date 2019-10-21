@@ -6,16 +6,16 @@ describe('Integration tests', () => {
   describe('Tasks', () => {
 
     let taskName, fullTaskName;
-    const context = {myContext: false};
+    const context = { myContext: false };
     const serviceName = 'my-test-service';
 
-    const enqueueTaskOptions = {exchange: {autoDelete: true}};
-    const registerTaskConsumerOptions = {exchange: {autoDelete: true}, queue: {autoDelete: true}};
+    const enqueueTaskOptions = { exchange: { autoDelete: true } };
+    const registerTaskConsumerOptions = { exchange: { autoDelete: true }, queue: { autoDelete: true } };
 
     let rabbit;
 
     before(() => {
-      rabbit = new CoinifyRabbit({service: {name: serviceName}});
+      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
     });
 
     beforeEach(() => {
@@ -43,7 +43,7 @@ describe('Integration tests', () => {
       const uuid = '12341234-1234-1234-1234-123412341234';
       const time = 1511944077916;
 
-      const enqueueOptions = _.defaults({uuid, time}, enqueueTaskOptions);
+      const enqueueOptions = _.defaults({ uuid, time }, enqueueTaskOptions);
 
       return new Promise(async (resolve, reject) => {
         await rabbit.registerTaskConsumer(taskName, async (c, t) => {
@@ -61,7 +61,7 @@ describe('Integration tests', () => {
 
       return new Promise(async (resolve) => {
         const contexts = _.map(_.range(taskCount), i => {
-          return {taskNumber: i};
+          return { taskNumber: i };
         });
 
         let tasksConsumed = 0;
@@ -93,7 +93,7 @@ describe('Integration tests', () => {
 
       const taskIds = _.range(taskCount);
       const contexts = _.map(taskIds, i => {
-        return {taskNumber: i};
+        return { taskNumber: i };
       });
 
       return new Promise(async (resolve) => {
@@ -125,7 +125,7 @@ describe('Integration tests', () => {
         // Retry 4 times with 0.75 second delay
         const delayMillis = 750;
         const maxAttempts = 4;
-        const consumeOptions = _.defaultsDeep({retry: {backoff: {type: 'fixed', delay: delayMillis / 1000}, maxAttempts}}, registerTaskConsumerOptions);
+        const consumeOptions = _.defaultsDeep({ retry: { backoff: { type: 'fixed', delay: delayMillis / 1000 }, maxAttempts } }, registerTaskConsumerOptions);
         let startTime = Date.now();
         let attempt = 0;
 
@@ -163,7 +163,7 @@ describe('Integration tests', () => {
       const taskCount = 3 * prefetch;
       const consumeTime = 250;
 
-      const consumerOptions = _.defaultsDeep({consumer: {prefetch}}, registerTaskConsumerOptions);
+      const consumerOptions = _.defaultsDeep({ consumer: { prefetch } }, registerTaskConsumerOptions);
       const consumeTimestamps = [];
 
       await new Promise(async (resolve) => {

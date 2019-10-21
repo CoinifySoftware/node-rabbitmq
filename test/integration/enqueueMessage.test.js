@@ -6,14 +6,14 @@ describe('Integration tests', () => {
 
   describe('#enqueueMessage', () => {
 
-    const context = {myContext: false};
+    const context = { myContext: false };
     const serviceName = 'my-test-service';
-    const registerConsumerOptions = {exchange: {autoDelete: true}, queue: {autoDelete: true}};
-    const enqueueMessageOptions = {exchange: {autoDelete: true}};
+    const registerConsumerOptions = { exchange: { autoDelete: true }, queue: { autoDelete: true } };
+    const enqueueMessageOptions = { exchange: { autoDelete: true } };
 
     let rabbit;
     before(() => {
-      rabbit = new CoinifyRabbit({service: {name: serviceName}});
+      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
     });
 
     after(async () => {

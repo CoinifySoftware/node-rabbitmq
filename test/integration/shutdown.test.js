@@ -8,13 +8,13 @@ describe('Integration tests', () => {
     let taskName, eventName, fullTaskName, fullEventName;
     const serviceName = 'my-test-service';
 
-    const enqueueOptions = {exchange: {autoDelete: true}};
-    const consumeOptions = {exchange: {autoDelete: true}, queue: {autoDelete: true}};
+    const enqueueOptions = { exchange: { autoDelete: true } };
+    const consumeOptions = { exchange: { autoDelete: true }, queue: { autoDelete: true } };
 
     let rabbit;
 
     beforeEach(() => {
-      rabbit = new CoinifyRabbit({service: {name: serviceName}});
+      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
       taskName = 'my-task' + Math.random();
       eventName = 'my-event' + Math.random();
       fullTaskName = serviceName + '.' + taskName;
@@ -77,7 +77,7 @@ describe('Integration tests', () => {
       /*
        * Connect to rabbitMQ again, checking that no events or tasks are in the queue
        */
-      rabbit = new CoinifyRabbit({service: {name: serviceName}});
+      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
 
       await rabbit.registerEventConsumer(fullEventName, async (c, e) => {
         eventConsumeCount += 1;
@@ -137,7 +137,7 @@ describe('Integration tests', () => {
       /*
        * Connect to rabbitMQ again, checking that no events are in the queue, but a task should be
        */
-      rabbit = new CoinifyRabbit({service: {name: serviceName}});
+      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
 
       await rabbit.registerEventConsumer(fullEventName, async (c, e) => {
         eventConsumeCount += 1;
@@ -168,7 +168,7 @@ describe('Integration tests', () => {
 
       // disable autoDelete for queue, as we need to enqueue a task which should persist until the otherRabbit
       // consumer is ready. Delete the queue automatically after 1 second of incativity.
-      const myConsumeOptions = _.defaultsDeep({queue: {expires: 1000, autoDelete: false}}, consumeOptions);
+      const myConsumeOptions = _.defaultsDeep({ queue: { expires: 1000, autoDelete: false } }, consumeOptions);
 
       await rabbit.registerTaskConsumer(taskName, async(c, t) => {
         consumeCount++;
@@ -181,7 +181,7 @@ describe('Integration tests', () => {
       const elapsedMillis = Date.now() - startTime;
       expect(elapsedMillis).to.be.at.most(100);
 
-      const otherRabbit = new CoinifyRabbit({service: {name: serviceName}});
+      const otherRabbit = new CoinifyRabbit({ service: { name: serviceName } });
 
       // Emit an event which should not be consumed
       await otherRabbit.enqueueTask(fullTaskName, {}, enqueueOptions);

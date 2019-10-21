@@ -25,7 +25,7 @@ describe('CoinifyRabbit', () => {
 
       task = {
         taskName: fullTaskName,
-        context: {theContext: true},
+        context: { theContext: true },
         uuid: '1234-4321',
         time: 1122334455
       };
@@ -39,7 +39,7 @@ describe('CoinifyRabbit', () => {
       channelAckStub = sinon.stub();
       consumeFnStub = sinon.stub();
       _getChannelStub = sinon.stub(rabbit, '_getChannel');
-      _getChannelStub.resolves({ack: channelAckStub});
+      _getChannelStub.resolves({ ack: channelAckStub });
       _handleConsumeRejectionStub = sinon.stub(rabbit, '_handleConsumeRejection');
     });
 
@@ -55,10 +55,10 @@ describe('CoinifyRabbit', () => {
       expect(await rabbit._handleConsumeMessage(message, 'task', options, consumeFnStub)).to.equal(true);
 
       expect(consumeFnStub.calledOnce).to.equal(true);
-      expect(consumeFnStub.firstCall.args).to.deep.equal([task.context, task]);
+      expect(consumeFnStub.firstCall.args).to.deep.equal([ task.context, task ]);
 
       expect(channelAckStub.calledOnce).to.equal(true);
-      expect(channelAckStub.firstCall.args).to.deep.equal([message]);
+      expect(channelAckStub.firstCall.args).to.deep.equal([ message ]);
 
       expect(_handleConsumeRejectionStub.notCalled).to.equal(true);
     });
@@ -72,17 +72,17 @@ describe('CoinifyRabbit', () => {
       await rabbit._handleConsumeMessage(message, 'task', options, consumeFnStub);
 
       expect(consumeFnStub.calledOnce).to.equal(true);
-      expect(consumeFnStub.firstCall.args).to.deep.equal([task.context, task]);
+      expect(consumeFnStub.firstCall.args).to.deep.equal([ task.context, task ]);
 
       expect(channelAckStub.calledOnce).to.equal(true);
-      expect(channelAckStub.firstCall.args).to.deep.equal([message]);
+      expect(channelAckStub.firstCall.args).to.deep.equal([ message ]);
 
       expect(_handleConsumeRejectionStub.calledOnce).to.equal(true);
-      expect(_handleConsumeRejectionStub.firstCall.args).to.deep.equal([message, 'task', task, consumeError, options]);
+      expect(_handleConsumeRejectionStub.firstCall.args).to.deep.equal([ message, 'task', task, consumeError, options ]);
     });
 
     it('should call onCancel option function if message is null', async () => {
-      const onCancelResolution = {theResult: true};
+      const onCancelResolution = { theResult: true };
       options.onCancel = sinon.stub();
       options.onCancel.resolves(onCancelResolution);
 

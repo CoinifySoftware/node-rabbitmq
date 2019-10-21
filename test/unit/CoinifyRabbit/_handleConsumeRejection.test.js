@@ -39,22 +39,22 @@ describe('CoinifyRabbit', () => {
         }
       };
       options = {
-        retry: {retryOptions: true},
-        exchange: {exchangeOptions: true},
-        queue: {queueOptions: true},
+        retry: { retryOptions: true },
+        exchange: { exchangeOptions: true },
+        queue: { queueOptions: true },
         queueName: 'the-original-queue'
       };
 
       channelPublishStub = sinon.stub();
       channelPublishStub.resolves(true);
       _getChannelStub = sinon.stub(rabbit, '_getChannel');
-      _getChannelStub.resolves({publish: channelPublishStub});
+      _getChannelStub.resolves({ publish: channelPublishStub });
       _assertRetryExchangeAndQueueStub = sinon.stub(rabbit, '_assertRetryExchangeAndQueue');
-      _assertRetryExchangeAndQueueStub.resolves({retryExchangeName, retryQueueName});
+      _assertRetryExchangeAndQueueStub.resolves({ retryExchangeName, retryQueueName });
       _assertDeadLetterExchangeAndQueueStub = sinon.stub(rabbit, '_assertDeadLetterExchangeAndQueue');
       _assertDeadLetterExchangeAndQueueStub.resolves(retryExchangeName);
       _decideConsumerRetryStub = sinon.stub(CoinifyRabbit, '_decideConsumerRetry');
-      _decideConsumerRetryStub.returns({shouldRetry: false, delaySeconds: 0});
+      _decideConsumerRetryStub.returns({ shouldRetry: false, delaySeconds: 0 });
     });
 
     afterEach(() => {
@@ -86,15 +86,15 @@ describe('CoinifyRabbit', () => {
     it('should re-publish to retry queue if _decideConsumerRetry() returns shouldRetry: true', async () => {
       const delaySeconds = 6660;
 
-      _decideConsumerRetryStub.returns({shouldRetry: true, delaySeconds});
+      _decideConsumerRetryStub.returns({ shouldRetry: true, delaySeconds });
 
       await rabbit._handleConsumeRejection(message, 'task', task, consumeError, options);
 
       expect(_decideConsumerRetryStub.calledOnce).to.equal(true);
-      expect(_decideConsumerRetryStub.firstCall.args).to.deep.equal([task.attempts, options.retry]);
+      expect(_decideConsumerRetryStub.firstCall.args).to.deep.equal([ task.attempts, options.retry ]);
 
       expect(_assertRetryExchangeAndQueueStub.calledOnce).to.equal(true);
-      expect(_assertRetryExchangeAndQueueStub.firstCall.args).to.deep.equal([delaySeconds, _.pick(options, ['exchange', 'queue'])]);
+      expect(_assertRetryExchangeAndQueueStub.firstCall.args).to.deep.equal([ delaySeconds, _.pick(options, [ 'exchange', 'queue' ]) ]);
 
       expect(_assertDeadLetterExchangeAndQueueStub.notCalled).to.equal(true);
 
@@ -103,7 +103,7 @@ describe('CoinifyRabbit', () => {
       expect(channelPublishStub.firstCall.args[0]).to.equal(retryExchangeName);
       expect(channelPublishStub.firstCall.args[1]).to.equal(options.queueName);
       expect(channelPublishStub.firstCall.args[2]).to.be.instanceof(Buffer);
-      expect(channelPublishStub.firstCall.args[3]).to.deep.equal({BCC: retryQueueName});
+      expect(channelPublishStub.firstCall.args[3]).to.deep.equal({ BCC: retryQueueName });
       const messageDecoded = JSON.parse(channelPublishStub.firstCall.args[2].toString());
       expect(messageDecoded).to.deep.equal(_.set(task, 'attempts', task.attempts+1));
     });
@@ -112,12 +112,12 @@ describe('CoinifyRabbit', () => {
       await rabbit._handleConsumeRejection(message, 'task', task, consumeError, options);
 
       expect(_decideConsumerRetryStub.calledOnce).to.equal(true);
-      expect(_decideConsumerRetryStub.firstCall.args).to.deep.equal([task.attempts, options.retry]);
+      expect(_decideConsumerRetryStub.firstCall.args).to.deep.equal([ task.attempts, options.retry ]);
 
       expect(_assertRetryExchangeAndQueueStub.notCalled).to.equal(true);
 
       expect(_assertDeadLetterExchangeAndQueueStub.calledOnce).to.equal(true);
-      expect(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([_.pick(options, ['exchange', 'queue'])]);
+      expect(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([ _.pick(options, [ 'exchange', 'queue' ]) ]);
 
       expect(channelPublishStub.calledOnce).to.equal(true);
       expect(channelPublishStub.firstCall.args).to.have.lengthOf(4);
@@ -135,14 +135,14 @@ describe('CoinifyRabbit', () => {
 
       // _decideConsumerRetry returns shouldRetry: false, but we want to override it
       const delaySeconds = 6660;
-      _decideConsumerRetryStub.returns({shouldRetry: true, delaySeconds});
+      _decideConsumerRetryStub.returns({ shouldRetry: true, delaySeconds });
 
       await rabbit._handleConsumeRejection(message, 'task', task, consumeError, options);
 
       expect(_assertRetryExchangeAndQueueStub.notCalled).to.equal(true);
 
       expect(_assertDeadLetterExchangeAndQueueStub.calledOnce).to.equal(true);
-      expect(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([_.pick(options, ['exchange', 'queue'])]);
+      expect(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([ _.pick(options, [ 'exchange', 'queue' ]) ]);
 
       expect(channelPublishStub.calledOnce).to.equal(true);
       expect(channelPublishStub.firstCall.args).to.have.lengthOf(4);

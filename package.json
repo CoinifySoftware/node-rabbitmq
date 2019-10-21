@@ -21,13 +21,13 @@
     "uuid": "^3.1.0"
   },
   "devDependencies": {
-    "@coinify/eslint-config-coinify": "^1.1.5",
+    "@coinify/eslint-config-coinify": "^1.3.1",
     "chai": "^4.1.2",
     "chai-as-promised": "^7.1.1",
     "chai-subset": "^1.6.0",
     "cli": "^1.0.1",
-    "eslint": "^4.12.1",
-    "eslint-plugin-mocha": "^4.7.0",
+    "eslint": "^6.5.1",
+    "eslint-plugin-mocha": "^6.2.0",
     "mocha": "^4.0.1",
     "rewire": "^3.0.2",
     "sinon": "^4.1.2"

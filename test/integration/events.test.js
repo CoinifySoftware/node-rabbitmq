@@ -6,16 +6,16 @@ describe('Integration tests', () => {
   describe('Events', () => {
 
     let eventName, fullEventName;
-    const context = {myContext: false};
+    const context = { myContext: false };
     const serviceName = 'my-test-service';
 
-    const emitEventOptions = {exchange: {autoDelete: true}};
-    const registerEventConsumerOptions = {exchange: {autoDelete: true}, queue: {autoDelete: true}};
+    const emitEventOptions = { exchange: { autoDelete: true } };
+    const registerEventConsumerOptions = { exchange: { autoDelete: true }, queue: { autoDelete: true } };
 
     let rabbit;
 
     before(() => {
-      rabbit = new CoinifyRabbit({service: {name: serviceName}});
+      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
     });
 
     beforeEach(() => {
@@ -43,7 +43,7 @@ describe('Integration tests', () => {
       const uuid = '12341234-1234-1234-1234-123412341234';
       const time = 1511944077916;
 
-      const emitOptions = _.defaults({uuid, time}, emitEventOptions);
+      const emitOptions = _.defaults({ uuid, time }, emitEventOptions);
 
       return new Promise(async (resolve, reject) => {
         await rabbit.registerEventConsumer(fullEventName, async (c, e) => {
@@ -62,7 +62,7 @@ describe('Integration tests', () => {
 
       return new Promise(async (resolve) => {
         const contexts = _.map(_.range(eventCount), i => {
-          return {eventNumber: i};
+          return { eventNumber: i };
         });
 
         let eventsConsumed = 0;
@@ -94,7 +94,7 @@ describe('Integration tests', () => {
 
       const eventIds = _.range(eventCount);
       const contexts = _.map(eventIds, i => {
-        return {eventNumber: i};
+        return { eventNumber: i };
       });
 
       return new Promise(async (resolve) => {
@@ -132,12 +132,12 @@ describe('Integration tests', () => {
 
       const eventIds = _.range(eventCount);
       const contexts = _.map(eventIds, i => {
-        return {eventNumber: i};
+        return { eventNumber: i };
       });
 
       return new Promise(async (resolve) => {
         for (const i of consumerIds) {
-          const consumeOptions = _.defaultsDeep({}, registerEventConsumerOptions, {service: {name: 'service' + i}});
+          const consumeOptions = _.defaultsDeep({}, registerEventConsumerOptions, { service: { name: 'service' + i } });
           await rabbit.registerEventConsumer(fullEventName, (c, e) => { // eslint-disable-line no-loop-func
             expect(e.eventName).to.equal(fullEventName);
 
@@ -193,23 +193,23 @@ describe('Integration tests', () => {
       const event3 = 'my-test-service.another-event.happened';
       const event4 = 'your-service.shit.hit.the.fan';
 
-      const context1 = {eventNumber: 1};
-      const context2 = {eventNumber: 2};
-      const context3 = {eventNumber: 3};
-      const context4 = {eventNumber: 4};
+      const context1 = { eventNumber: 1 };
+      const context2 = { eventNumber: 2 };
+      const context3 = { eventNumber: 3 };
+      const context4 = { eventNumber: 4 };
 
-      const eventsConsumedByConsumer = {1: [], 2: [], 3: [], 4: []};
+      const eventsConsumedByConsumer = { 1: [], 2: [], 3: [], 4: [] };
 
-      const emitEventOptionsWithoutServiceName = _.defaultsDeep({service: {name: false}}, emitEventOptions);
+      const emitEventOptionsWithoutServiceName = _.defaultsDeep({ service: { name: false } }, emitEventOptions);
 
       await new Promise(async (resolve) => {
         /*
          * Register consumers
          */
-        for (const [i, consumeKey] of [[1, consumeKey1], [2, consumeKey2], [3, consumeKey3], [4, consumeKey4]]) {
+        for (const [ i, consumeKey ] of [ [ 1, consumeKey1 ], [ 2, consumeKey2 ], [ 3, consumeKey3 ], [ 4, consumeKey4 ] ]) {
           await rabbit.registerEventConsumer(consumeKey, (context, event) => { // eslint-disable-line no-loop-func
             // Store that this event was consumed by this consumer
-            eventsConsumedByConsumer[i].push({context, event});
+            eventsConsumedByConsumer[i].push({ context, event });
 
             const totalEventsConsumed = _.flatten(_.values(eventsConsumedByConsumer)).length;
             if ( totalEventsConsumed === 10 ){
@@ -234,7 +234,7 @@ describe('Integration tests', () => {
        *
        * Yeah, 1-indexed arrays I know, but it matches the consumer/event numbers
        */
-      let {1: consumed1, 2: consumed2, 3: consumed3, 4: consumed4} = eventsConsumedByConsumer;
+      let { 1: consumed1, 2: consumed2, 3: consumed3, 4: consumed4 } = eventsConsumedByConsumer;
       expect(consumed1).to.have.lengthOf(1);
       expect(consumed2).to.have.lengthOf(2);
       expect(consumed3).to.have.lengthOf(3);
@@ -246,24 +246,24 @@ describe('Integration tests', () => {
       consumed3 = _.sortBy(consumed3, 'context.eventNumber');
       consumed4 = _.sortBy(consumed4, 'context.eventNumber');
 
-      expect(consumed1[0]).to.containSubset({event: {eventName: event1}, context: context1});
+      expect(consumed1[0]).to.containSubset({ event: { eventName: event1 }, context: context1 });
 
-      expect(consumed2[0]).to.containSubset({event: {eventName: event1}, context: context1});
-      expect(consumed2[1]).to.containSubset({event: {eventName: event2}, context: context2});
+      expect(consumed2[0]).to.containSubset({ event: { eventName: event1 }, context: context1 });
+      expect(consumed2[1]).to.containSubset({ event: { eventName: event2 }, context: context2 });
 
-      expect(consumed3[0]).to.containSubset({event: {eventName: event1}, context: context1});
-      expect(consumed3[1]).to.containSubset({event: {eventName: event2}, context: context2});
-      expect(consumed3[2]).to.containSubset({event: {eventName: event3}, context: context3});
+      expect(consumed3[0]).to.containSubset({ event: { eventName: event1 }, context: context1 });
+      expect(consumed3[1]).to.containSubset({ event: { eventName: event2 }, context: context2 });
+      expect(consumed3[2]).to.containSubset({ event: { eventName: event3 }, context: context3 });
 
-      expect(consumed4[0]).to.containSubset({event: {eventName: event1}, context: context1});
-      expect(consumed4[1]).to.containSubset({event: {eventName: event2}, context: context2});
-      expect(consumed4[2]).to.containSubset({event: {eventName: event3}, context: context3});
-      expect(consumed4[3]).to.containSubset({event: {eventName: event4}, context: context4});
+      expect(consumed4[0]).to.containSubset({ event: { eventName: event1 }, context: context1 });
+      expect(consumed4[1]).to.containSubset({ event: { eventName: event2 }, context: context2 });
+      expect(consumed4[2]).to.containSubset({ event: { eventName: event3 }, context: context3 });
+      expect(consumed4[3]).to.containSubset({ event: { eventName: event4 }, context: context4 });
     });
 
     it('should retry an event whose processing function rejected', async () => {
-      const eventConsumptionsByConsumer = {1: 0, 2: 0, 3: 0, 4: 0};
-      const expectedEventConsumptionsByConsumer = {1: 5, 2: 1, 3: 1, 4: 1};
+      const eventConsumptionsByConsumer = { 1: 0, 2: 0, 3: 0, 4: 0 };
+      const expectedEventConsumptionsByConsumer = { 1: 5, 2: 1, 3: 1, 4: 1 };
 
       const maxAttempts = 4;
       const delayMillis = 750;
@@ -272,12 +272,12 @@ describe('Integration tests', () => {
         /*
          * Register consumers
          */
-        for (const i of [1, 2, 3, 4]) {
+        for (const i of [ 1, 2, 3, 4 ]) {
 
           // Each consumer needs a different service name to create different queues
           const consumeOptions = _.defaultsDeep({
-            retry: {backoff: {type: 'fixed', delay: delayMillis / 1000}, maxAttempts},
-            service: {name: 'service'+i}
+            retry: { backoff: { type: 'fixed', delay: delayMillis / 1000 }, maxAttempts },
+            service: { name: 'service'+i }
           }, registerEventConsumerOptions);
 
           await rabbit.registerEventConsumer(fullEventName, async (context, event) => { // eslint-disable-line no-loop-func
@@ -309,7 +309,7 @@ describe('Integration tests', () => {
       const taskCount = 3 * prefetch;
       const consumeTime = 250;
 
-      const consumerOptions = _.defaultsDeep({consumer: {prefetch}}, registerEventConsumerOptions);
+      const consumerOptions = _.defaultsDeep({ consumer: { prefetch } }, registerEventConsumerOptions);
       const consumeTimestamps = [];
 
       await new Promise(async (resolve) => {

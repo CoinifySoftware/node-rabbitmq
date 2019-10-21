@@ -7,16 +7,18 @@ describe('Integration tests', () => {
 
     let rabbit, taskName, fullTaskName, eventName, fullEventName;
     const serviceName = 'my-test-service',
-      enqueueOptions = {exchange: {autoDelete: true}},
-      consumerOptions = {exchange: {autoDelete: true}, queue: {autoDelete: true}, retry: {maxAttempts: 0}},
-      enqueueMessageOptions = {exchange: {autoDelete: true}},
-      failedMessageConsumerOptions = {exchange: {autoDelete: true}, queue: {autoDelete: true}},
-      eventContext = {myEventContext: false},
-      taskContext = {myTaskContext: false},
-      failingFn = async () => { throw new Error('event processing function rejected'); };
+      enqueueOptions = { exchange: { autoDelete: true } },
+      consumerOptions = { exchange: { autoDelete: true }, queue: { autoDelete: true }, retry: { maxAttempts: 0 } },
+      enqueueMessageOptions = { exchange: { autoDelete: true } },
+      failedMessageConsumerOptions = { exchange: { autoDelete: true }, queue: { autoDelete: true } },
+      eventContext = { myEventContext: false },
+      taskContext = { myTaskContext: false },
+      failingFn = async () => {
+        throw new Error('event processing function rejected');
+      };
 
     beforeEach(async() => {
-      rabbit = new CoinifyRabbit({service: {name: serviceName}});
+      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
       taskName = 'my-task' + Math.random();
       fullTaskName = serviceName + '.' + taskName;
       eventName = 'my-event' + Math.random();
@@ -39,13 +41,13 @@ describe('Integration tests', () => {
             expect(m.taskName).to.equal(fullTaskName);
             expect(m.attempts).to.deep.equal(1);
             expect(m.context).to.deep.equal(taskContext);
-            taskConsumed = true;  
+            taskConsumed = true;
           }
           if (m.eventName){
             expect(m.eventName).to.equal(fullEventName);
             expect(m.attempts).to.deep.equal(1);
             expect(m.context).to.deep.equal(eventContext);
-            eventConsumed = true;  
+            eventConsumed = true;
           }
 
           if (eventConsumed && taskConsumed) {
@@ -63,7 +65,7 @@ describe('Integration tests', () => {
         let punishMeDaddy = true;
         const fn = async (c, m) => {
           if (punishMeDaddy){
-            throw new Error('message processing function rejected'); 
+            throw new Error('message processing function rejected');
           } else {
             expect(m.taskName).to.equal(fullTaskName);
             expect(m.context).to.deep.equal(taskContext);

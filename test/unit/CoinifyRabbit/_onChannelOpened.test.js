@@ -13,7 +13,7 @@ describe('CoinifyRabbit', () => {
       channel,
       rabbit;
 
-    const config = {channel: {prefetch: 123}};
+    const config = { channel: { prefetch: 123 } };
 
     beforeEach(() => {
       rabbit = new CoinifyRabbit(config);
@@ -24,7 +24,7 @@ describe('CoinifyRabbit', () => {
       channelPrefetchStub = sinon.stub();
       channelPrefetchStub.resolves();
 
-      channel = {prefetch: channelPrefetchStub};
+      channel = { prefetch: channelPrefetchStub };
     });
 
     afterEach(() => {
@@ -35,7 +35,7 @@ describe('CoinifyRabbit', () => {
       await rabbit._onChannelOpened(channel);
 
       expect(channelPrefetchStub.calledOnce).to.equal(true);
-      expect(channelPrefetchStub.firstCall.args).to.deep.equal([config.channel.prefetch, true]);
+      expect(channelPrefetchStub.firstCall.args).to.deep.equal([ config.channel.prefetch, true ]);
     });
 
     it('should recreate registered consumers', async () => {

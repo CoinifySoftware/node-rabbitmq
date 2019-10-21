@@ -52,7 +52,7 @@ describe('CoinifyRabbit', () => {
       amqplibConnectStub.withArgs(connectionUrl).rejects(new Error('amqplib.connect() called more than once.'));
 
       // Get three connections in parallel
-      const [conn1, conn2, conn3] = await Promise.all([rabbit._getConnection(), rabbit._getConnection(), rabbit._getConnection()]);
+      const [ conn1, conn2, conn3 ] = await Promise.all([ rabbit._getConnection(), rabbit._getConnection(), rabbit._getConnection() ]);
 
       expect(conn1).to.equal(conn);
       expect(conn2).to.equal(conn);
@@ -61,7 +61,7 @@ describe('CoinifyRabbit', () => {
       expect(amqplibConnectStub.calledOnce).to.equal(true);
 
       // Try again with three more connections, expect the caching to have already happened
-      const [conn4, conn5, conn6] = await Promise.all([rabbit._getConnection(), rabbit._getConnection(), rabbit._getConnection()]);
+      const [ conn4, conn5, conn6 ] = await Promise.all([ rabbit._getConnection(), rabbit._getConnection(), rabbit._getConnection() ]);
 
       expect(conn4).to.equal(conn);
       expect(conn5).to.equal(conn);

@@ -26,8 +26,7 @@ const CoinifyRabbit = require('@coinify/rabbitmq');
 ### `new CoinifyRabbit(options)`
 _Creates a new instance of `CoinifyRabbit`_
 
-The `options` argument overrides default configuration options that are specified in `config/default.js` and `config/<environment>.js` files
-(where `<environment>` is determined by the `NODE_ENV` environment variable).
+The `options` argument overrides default configuration options that are specified in the `static getDefaultConfig()` function in `lib/CoinifyRabbit.js`.
 
 ```js
 const options = {
@@ -35,7 +34,7 @@ const options = {
   service: { // Service-specific options
     name: 'my-service' // Different service names consume events from different queues
   }
-  // For all configuration options, see config/default.js
+  // For all configuration options, see getDefaultConfig() static function
 };
 
 const coinifyRabbit = new CoinifyRabbit(options);

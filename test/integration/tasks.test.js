@@ -15,7 +15,7 @@ describe('Integration tests', () => {
     let rabbit;
 
     before(() => {
-      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
+      rabbit = new CoinifyRabbit({ service: { name: serviceName }, defaultLogLevel: 'fatal' });
     });
 
     beforeEach(() => {
@@ -226,6 +226,27 @@ describe('Integration tests', () => {
         const diff = timestampMeans[i] - timestampMeans[i-1];
         expect(diff).to.be.at.least(consumeTime - 100).and.at.most(consumeTime + 100);
       }
+    });
+
+    it('should be able to enqueue a delayed task', async () => {
+      const delayMillis = 1000;
+      const enqueueOptions = Object.assign({ delayMillis }, enqueueTaskOptions);
+      let enqueueTime;
+
+      return new Promise(async (resolve) => {
+        await rabbit.registerTaskConsumer(taskName, async (c, t) => {
+          const consumeTime = Date.now();
+
+          expect(t.taskName).to.equal(fullTaskName);
+          expect(t.delayMillis).to.equal(delayMillis);
+          expect(c).to.deep.equal(context);
+          expect(consumeTime - enqueueTime).to.be.closeTo(delayMillis, 50);
+
+          resolve();
+        }, registerTaskConsumerOptions);
+        enqueueTime = Date.now();
+        await rabbit.enqueueTask(fullTaskName, context, enqueueOptions);
+      });
     });
 
   });

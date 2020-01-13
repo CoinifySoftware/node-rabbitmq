@@ -18,7 +18,7 @@ describe('Integration tests', () => {
       };
 
     beforeEach(async() => {
-      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
+      rabbit = new CoinifyRabbit({ service: { name: serviceName }, defaultLogLevel: 'fatal' });
       taskName = 'my-task' + Math.random();
       fullTaskName = serviceName + '.' + taskName;
       eventName = 'my-event' + Math.random();
@@ -58,7 +58,7 @@ describe('Integration tests', () => {
         await rabbit.enqueueTask(fullTaskName, taskContext, enqueueOptions);
         await rabbit.emitEvent(eventName, eventContext, enqueueOptions);
       });
-    });
+    }).timeout(3000);
 
     it('should be able to reenqueue a failed message', async () => {
       return new Promise(async (resolve) => {

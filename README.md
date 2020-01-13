@@ -186,17 +186,21 @@ Subscribing to consuming a task (using `#registerTaskConsumer(taskName, consumeF
 `'tasks.' + options.service.name + '.' + taskName`, and binds it to the exchange,
 using `options.service.name + '.' + taskName` as the _binding key_.
 
+A task can be enqueued delayed, meaning that it won't be available for consumers until a specified delay has passed.
+See the below "_Delayed tasks_" section for more information.
+
 ### Task message
 
 Enqueueing a task with name `taskName` and context `context` publishes the following JSON object:
-```js
+```json
 {
-  taskName: taskName,
-  context: context,
-  uuid: 'f07d33d7-f56f-4c89-9489-1bc89d3a6483', // Actual UUID generated upon emit
-  time: 1506331856322, // Timestamp of event, in milliseconds since UNIX epoc
-  attempt: 0, // number of current attempt. Used by retry mechanism
-  origin: 'another-service' // Name of service that enqueued the task
+  "taskName": taskName,
+  "context": context,
+  "uuid": 'f07d33d7-f56f-4c89-9489-1bc89d3a6483', // Actual UUID generated upon emit
+  "time": 1506331856322, // Timestamp of task, in milliseconds since UNIX epoc
+  "attempt": 0, // number of current attempt. Used by retry mechanism
+  "origin": 'another-service', // Name of service that enqueued the task
+  "delayMillis": 60000 // Only present if task was enqueued as a delayed task
 }
 ```
 
@@ -227,6 +231,20 @@ const result = await coinifyRabbit.enqueueTask('my-service.my-task', {myContext:
 
 // result is true if task was enqueued correctly.
 ```
+
+#### Delayed tasks
+
+In order to enqueue a delayed task, you must specify a `delayMillis` field in the `options` object when
+calling `enqueueTask()`. The following example enqueues a task that will not be ready for consumption
+until 1 minute (60 seconds) later:
+
+```js
+await coinifyRabbit.enqueueTask('my-service.my-task', {myContext: true}, {delayMillis: 60000});
+```
+
+Retry functionality for tasks and events is implemented using (Dead Letter Exchanges)[https://www.rabbitmq.com/dlx.html] and
+(Per-Queue Message TTL)[https://www.rabbitmq.com/ttl.html] similarly to the retry functionality described in greater detail
+below.
 
 ### `#registerTaskConsumer(taskName, consumeFn, options={})`
 _Registers a function for consuming a specific task_

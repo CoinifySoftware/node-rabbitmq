@@ -1,7 +1,6 @@
 'use strict';
 
 const sinon = require('sinon'),
-  rewire = require('rewire'),
   EventEmitter = require('events');
 
 const CoinifyRabbit = require('../../../lib/CoinifyRabbit');

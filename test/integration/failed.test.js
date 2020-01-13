@@ -18,7 +18,7 @@ describe('Integration tests', () => {
       };
 
     beforeEach(async() => {
-      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
+      rabbit = new CoinifyRabbit({ service: { name: serviceName }, defaultLogLevel: 'fatal' });
       taskName = 'my-task' + Math.random();
       fullTaskName = serviceName + '.' + taskName;
       eventName = 'my-event' + Math.random();

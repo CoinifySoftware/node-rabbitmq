@@ -15,7 +15,7 @@ describe('Integration tests', () => {
     let rabbit;
 
     before(() => {
-      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
+      rabbit = new CoinifyRabbit({ service: { name: serviceName }, defaultLogLevel: 'fatal' });
     });
 
     beforeEach(() => {

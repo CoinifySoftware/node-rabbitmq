@@ -25,7 +25,7 @@ describe('CoinifyRabbit', () => {
     const retryQueueName = 'the-retry-queue';
 
     beforeEach(() => {
-      rabbit = new CoinifyRabbit({defaultLogLevel: 'fatal'});
+      rabbit = new CoinifyRabbit({ defaultLogLevel: 'fatal' });
 
       message = {
         fields: {

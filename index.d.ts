@@ -40,7 +40,7 @@ interface CoinifyRabbitConfiguration {
     prefetch?: number;
   };
   defaultLogLevel?: string;
-};
+}
 
 interface EnqueueMessageOptions {
   uuid?: string;

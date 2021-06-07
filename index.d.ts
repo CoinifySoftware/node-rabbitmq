@@ -57,7 +57,7 @@ export interface Event {
   eventName: string;
   context: any;
   uuid: string;
-  time: Date;
+  time: number;
   attempts: number;
 }
 
@@ -65,7 +65,7 @@ export interface Task {
   taskName: string;
   context: any;
   uuid: string;
-  time: Date;
+  time: number;
   attempts: number;
   origin: string;
   delayMillis: number;
@@ -82,7 +82,7 @@ interface RetryFixedBackoffConfiguration {
   delay?: number
 }
 
-interface RetryConfiguration {
+type RetryConfiguration = false | {
   backoff?:  RetryExponentialBackoffConfiguration | RetryFixedBackoffConfiguration;
   maxAttempts?: number;
 }
@@ -148,7 +148,7 @@ export default class CoinifyRabbit {
   registerEventConsumer(eventKey: string, consumeFn: (context: any, event: Event) => Promise<any>, options?: RegisterEventConsumerOptions): Promise<any>;
   enqueueTask(fullTaskName: string, context?: any, options?: EnqueueMessageOptions): Promise<any>;
   registerTaskConsumer(taskName: string, consumeFn: (context: any, task: Task) => Promise<any>, options?: RegisterTaskConsumerOptions): Promise<any>;
-  registerFailedMessageConsumer(consumeFn: (routingKey: any, message: Event | Task) => Promise<any>, options?: RegisterFailedMessageConsumerOptions): Promise<any>
+  registerFailedMessageConsumer(consumeFn: (routingKey: string, message: Event | Task) => Promise<any>, options?: RegisterFailedMessageConsumerOptions): Promise<any>
   enqueueMessage(queueName: string, messageObject: Event | Task, options?: EnqueueMessageOptions): Promise<any>
   shutdown(timeout?: number): Promise<any>;
   assertConnection(): Promise<void>;

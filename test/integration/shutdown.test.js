@@ -1,6 +1,7 @@
 'use strict';
 
 const CoinifyRabbit = require('../../lib/CoinifyRabbit');
+const { createRabbitMQTestInstance } = require('../bootstrap.test');
 
 describe('Integration tests', () => {
   describe('Graceful shutdown', () => {
@@ -14,7 +15,7 @@ describe('Integration tests', () => {
     let rabbit;
 
     beforeEach(() => {
-      rabbit = new CoinifyRabbit({ service: { name: serviceName }, defaultLogLevel: 'fatal' });
+      rabbit = createRabbitMQTestInstance({ service: { name: serviceName }, defaultLogLevel: 'fatal' });
       taskName = 'my-task' + Math.random();
       eventName = 'my-event' + Math.random();
       fullTaskName = serviceName + '.' + taskName;
@@ -77,7 +78,7 @@ describe('Integration tests', () => {
       /*
        * Connect to rabbitMQ again, checking that no events or tasks are in the queue
        */
-      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
+      rabbit = createRabbitMQTestInstance({ service: { name: serviceName } });
 
       await rabbit.registerEventConsumer(fullEventName, async (c, e) => {
         eventConsumeCount += 1;
@@ -137,7 +138,7 @@ describe('Integration tests', () => {
       /*
        * Connect to rabbitMQ again, checking that no events are in the queue, but a task should be
        */
-      rabbit = new CoinifyRabbit({ service: { name: serviceName } });
+      rabbit = createRabbitMQTestInstance({ service: { name: serviceName } });
 
       await rabbit.registerEventConsumer(fullEventName, async (c, e) => {
         eventConsumeCount += 1;
@@ -181,7 +182,7 @@ describe('Integration tests', () => {
       const elapsedMillis = Date.now() - startTime;
       expect(elapsedMillis).to.be.at.most(100);
 
-      const otherRabbit = new CoinifyRabbit({ service: { name: serviceName } });
+      const otherRabbit = createRabbitMQTestInstance({ service: { name: serviceName } });
 
       // Emit an event which should not be consumed
       await otherRabbit.enqueueTask(fullTaskName, {}, enqueueOptions);

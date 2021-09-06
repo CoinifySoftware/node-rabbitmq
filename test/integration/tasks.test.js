@@ -1,6 +1,7 @@
 'use strict';
 
 const CoinifyRabbit = require('../../lib/CoinifyRabbit');
+const { createRabbitMQTestInstance } = require('../bootstrap.test');
 
 describe('Integration tests', () => {
   describe('Tasks', () => {
@@ -15,7 +16,7 @@ describe('Integration tests', () => {
     let rabbit;
 
     before(() => {
-      rabbit = new CoinifyRabbit({ service: { name: serviceName }, defaultLogLevel: 'fatal' });
+      rabbit = createRabbitMQTestInstance({ service: { name: serviceName }, defaultLogLevel: 'fatal' });
     });
 
     beforeEach(() => {

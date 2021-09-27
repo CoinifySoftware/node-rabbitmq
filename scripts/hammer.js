@@ -44,9 +44,9 @@ async function run() {
   };
   const rabbit = new CoinifyRabbit(rabbitOptions);
 
-  await Promise.all(new Array(number).fill().map(async () => {
+  new Array(number).fill().map(() => {
     return type === 'event' ? rabbit.emitEvent(name, context, { service: { name: null } }) : rabbit.enqueueTask(name, context);
-  }));
+  });
 
   await rabbit.shutdown();
 
@@ -61,4 +61,5 @@ async function main() {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-floating-promises
 main();

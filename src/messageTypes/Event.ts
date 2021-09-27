@@ -31,7 +31,7 @@ export interface OnEventErrorFunctionParams {
 export interface RegisterEventConsumerOptions {
   consumerTag?: string;
   onCancel?: () => Promise<any>;
-  onError?: (params: OnEventErrorFunctionParams) => Promise<any>;
+  onError?: (params: OnEventErrorFunctionParams) => Promise<void> | void;
   queue?: amqplib.Options.AssertQueue;
   exchange?: amqplib.Options.AssertExchange;
   uniqueQueue?: boolean;

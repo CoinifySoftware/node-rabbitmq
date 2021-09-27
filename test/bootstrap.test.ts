@@ -47,12 +47,12 @@ export async function reenableFailedMessageQueue(rabbit: CoinifyRabbit) {
   publishStub.restore();
 }
 
-process.on('unhandledRejection', async (err: any) => {
+process.on('unhandledRejection', (err: any) => {
   console.error('+++++ UNHANDLED REJECTION +++++');
   console.error(err);
   process.exit(1);
 });
-process.on('uncaughtException', async (err) => {
+process.on('uncaughtException', (err) => {
   console.error('+++++ UNCAUGHT EXCEPTION +++++');
   console.error(err);
   process.exit(1);

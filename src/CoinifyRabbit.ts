@@ -132,7 +132,7 @@ export default class CoinifyRabbit extends EventEmitter {
     const prefetch = options?.consumer?.prefetch ?? this.config.consumer.prefetch;
     await channel.prefetch(prefetch, false);
     const { consumerTag } = await channel.consume(q.queue,
-      async (message) => this._handleConsumeMessage(message, 'event', consumeMessageOptions, consumeFn),
+      (message) => this._handleConsumeMessage(message, 'event', consumeMessageOptions, consumeFn),
       { consumerTag: options?.consumerTag }
     );
 
@@ -223,7 +223,7 @@ export default class CoinifyRabbit extends EventEmitter {
     const prefetch = options?.consumer?.prefetch ?? this.config.consumer.prefetch;
     await channel.prefetch(prefetch, false);
     const { consumerTag } = await channel.consume(q.queue,
-      async (message) => this._handleConsumeMessage(message, 'task', consumeMessageOptions, consumeFn),
+      (message) => this._handleConsumeMessage(message, 'task', consumeMessageOptions, consumeFn),
       { consumerTag: options?.consumerTag }
     );
 
@@ -262,7 +262,7 @@ export default class CoinifyRabbit extends EventEmitter {
     const prefetch = options?.consumer?.prefetch ?? this.config.consumer.prefetch;
     await channel.prefetch(prefetch, false);
     const { consumerTag } = await channel.consume(q.queue,
-      async (message) => message && this._handleFailedMessage(message, { ...options, queueName }, consumeFn),
+      (message) => message && this._handleFailedMessage(message, { ...options, queueName }, consumeFn),
       { consumerTag: options?.consumerTag }
     );
 
@@ -474,7 +474,7 @@ export default class CoinifyRabbit extends EventEmitter {
    * @return {Promise.<void>}
    * @private
    */
-  private async _onChannelClosed(err?: Error) {
+  private _onChannelClosed(err?: Error) {
     if (this.isShuttingDown) {
       this.logger.info({ err }, 'Channel closed');
       // Channel close requested. We won't try to reconnect
@@ -497,7 +497,7 @@ export default class CoinifyRabbit extends EventEmitter {
    * @return {Promise.<void>}
    * @private
    */
-  private async _connectWithBackoff() {
+  private _connectWithBackoff() {
     // Attempts to reconnect after 1, 1, 2, 3, 5, 10, 20, 30, 50, 60, 60, 60... seconds
     const fibonacciBackoff = backoff.fibonacci({
       initialDelay: 1000,
@@ -563,7 +563,7 @@ export default class CoinifyRabbit extends EventEmitter {
     // If there are still active consumers, NACK 'em all
     if (_.size(this.activeMessageConsumptions)) {
       const channel = await this._getChannel();
-      await channel.nackAll();
+      channel.nackAll();
     }
 
     // Close channel if open
@@ -603,7 +603,7 @@ export default class CoinifyRabbit extends EventEmitter {
    * @return {Promise.<void>}
    * @private
    */
-  private async _waitForConsumersToFinish(timeout?: number) {
+  private _waitForConsumersToFinish(timeout?: number) {
     if (_.size(this.activeMessageConsumptions) === 0) {
       return;
     }
@@ -783,7 +783,7 @@ export default class CoinifyRabbit extends EventEmitter {
     const messageName = 'eventName' in messageObject ? messageObject.eventName : messageObject.taskName;
 
     const onError = options?.onError ??
-      (async () => {
+      (() => {
         // No onError function. We'll just log it with 'error' level
         const errMessage = `Error consuming ${messageType} ${messageName}: ${consumeError.message}. `
           + (shouldRetry ? `Will retry in ${delaySeconds} seconds` : 'No retry');
@@ -840,7 +840,7 @@ export default class CoinifyRabbit extends EventEmitter {
     const channel = await this._getChannel();
     const routingKey = options.queueName;
 
-    const publishResult = await channel.publish(republishExchangeName, routingKey, updatedMessage, publishOptions);
+    const publishResult = channel.publish(republishExchangeName, routingKey, updatedMessage, publishOptions);
     if (!publishResult) {
       const err = new Error(`channel.publish() to exchange '${republishExchangeName}' with routing key '${routingKey}'`
         + ` resolved to ${JSON.stringify(publishResult)}`);
@@ -894,11 +894,11 @@ export default class CoinifyRabbit extends EventEmitter {
       const consumeTimeMillis = Date.now() - startTime;
 
       const consumeResultTruncated = _.truncate(JSON.stringify(consumeResult), { length: 4096 });
-      await channel.ack(message);
+      channel.ack(message);
       this.logger.info({ message: msgObj, consumeResult: consumeResultTruncated, consumeTimeMillis }, 'message consumed');
     } catch (err) {
       this.logger.warn({ err, message: msgObj }, 'Error consuming message from failed queue');
-      await channel.nack(message);
+      channel.nack(message);
     }
     _.pull(this.activeMessageConsumptions, msgObj);
     this.emit('messageConsumed', msgObj);
@@ -919,7 +919,7 @@ export default class CoinifyRabbit extends EventEmitter {
 
     // Empty string is the default direct exchange
     const exchangeName = '';
-    const publishResult = await channel.publish(exchangeName, queueName, message, options?.exchange);
+    const publishResult = channel.publish(exchangeName, queueName, message, options?.exchange);
 
     if (!publishResult) {
       throw new Error('channel.publish() resolved to ' + JSON.stringify(publishResult));

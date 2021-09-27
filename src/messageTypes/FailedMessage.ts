@@ -16,7 +16,7 @@ export interface FailedMessageConsumer {
 export interface RegisterFailedMessageConsumerOptions {
   consumerTag?: string;
   onCancel?: () => Promise<any>;
-  onError?: (params: OnEventErrorFunctionParams | OnTaskErrorFunctionParams) => Promise<any>;
+  onError?: (params: OnEventErrorFunctionParams | OnTaskErrorFunctionParams) => Promise<void> | void;
   queue?: amqplib.Options.AssertQueue;
   consumer?: {
     prefetch?: number;

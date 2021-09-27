@@ -33,7 +33,7 @@ export interface OnTaskErrorFunctionParams {
 export interface RegisterTaskConsumerOptions {
   consumerTag?: string;
   onCancel?: () => Promise<any>;
-  onError?: (params: OnTaskErrorFunctionParams) => Promise<any>;
+  onError?: (params: OnTaskErrorFunctionParams) => Promise<void> | void;
   queue?: amqplib.Options.AssertQueue;
   exchange?: amqplib.Options.AssertExchange;
   uniqueQueue?: boolean;

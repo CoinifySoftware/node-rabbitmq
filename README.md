@@ -19,8 +19,14 @@ Re-connection will be attempted using fibonacci backoff with a maximum delay of 
 will be used between re-connection failures: 1, 1, 2, 3, 5, 10, 20, 30, 50, 60, 60, 60...
 
 ## `CoinifyRabbit` API
+#### JavaScript
 ```js
 const CoinifyRabbit = require('@coinify/rabbitmq');
+```
+
+#### TypeScript
+```ts
+import CoinifyRabbit from '@coinify/rabbitmq';
 ```
 
 ### `new CoinifyRabbit(options)`

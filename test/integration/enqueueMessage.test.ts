@@ -25,7 +25,7 @@ describe('Integration tests', () => {
       const fullEventName = serviceName + '.' + eventName;
 
       return new Promise(async (resolve) => {
-        await rabbit.registerEventConsumer(fullEventName, async (c, e) => {
+        await rabbit.registerEventConsumer(fullEventName, (c, e) => {
           expect(e.eventName).to.equal(fullEventName);
           expect(c).to.deep.equal(context);
 
@@ -51,7 +51,7 @@ describe('Integration tests', () => {
       const fullTaskName = serviceName + '.' + taskName;
 
       return new Promise(async (resolve) => {
-        await rabbit.registerTaskConsumer(taskName, async (c, t) => {
+        await rabbit.registerTaskConsumer(taskName, (c, t) => {
           expect(t.taskName).to.equal(fullTaskName);
           expect(c).to.deep.equal(context);
 

@@ -34,7 +34,7 @@ describe('Integration tests', () => {
        * - wait until both event and task consumption has finished
        */
       await new Promise(async (resolve) => {
-        const _consumed = async () => {
+        const _consumed = () => {
           if (eventConsumeCount === 1 && taskConsumeCount === 1) {
             // If both events were consumed, we can resolve the promise..:!
             resolve(undefined);
@@ -45,13 +45,13 @@ describe('Integration tests', () => {
         await rabbit.registerEventConsumer(fullEventName, async () => {
           await new Promise(resolve => setTimeout(resolve, 500));
           eventConsumeCount += 1;
-          await _consumed();
+          _consumed();
         }, consumeOptions);
 
         await rabbit.registerTaskConsumer(taskName, async () => {
           await new Promise(resolve => setTimeout(resolve, 1000));
           taskConsumeCount += 1;
-          await _consumed();
+          _consumed();
         }, consumeOptions);
 
         // Emit event and enqueue task
@@ -77,11 +77,11 @@ describe('Integration tests', () => {
        */
       rabbit = createRabbitMQTestInstance({ service: { name: serviceName } });
 
-      await rabbit.registerEventConsumer(fullEventName, async () => {
+      await rabbit.registerEventConsumer(fullEventName, () => {
         eventConsumeCount += 1;
       }, consumeOptions);
 
-      await rabbit.registerTaskConsumer(taskName, async () => {
+      await rabbit.registerTaskConsumer(taskName, () => {
         taskConsumeCount += 1;
       }, consumeOptions);
 
@@ -139,11 +139,11 @@ describe('Integration tests', () => {
        */
       rabbit = createRabbitMQTestInstance({ service: { name: serviceName } });
 
-      await rabbit.registerEventConsumer(fullEventName, async () => {
+      await rabbit.registerEventConsumer(fullEventName, () => {
         eventConsumeCount += 1;
       }, consumeOptions);
 
-      await rabbit.registerTaskConsumer(taskName, async () => {
+      await rabbit.registerTaskConsumer(taskName, () => {
         taskConsumeCount += 1;
       }, consumeOptions);
 
@@ -172,7 +172,7 @@ describe('Integration tests', () => {
       // consumer is ready. Delete the queue automatically after 1 second of incativity.
       const myConsumeOptions = _.defaultsDeep({ queue: { expires: 1000, autoDelete: false } }, consumeOptions);
 
-      await rabbit.registerTaskConsumer(taskName, async () => {
+      await rabbit.registerTaskConsumer(taskName, () => {
         consumeCount++;
       }, myConsumeOptions);
 
@@ -196,7 +196,7 @@ describe('Integration tests', () => {
 
       // Consume using other connection
       let consumeCountNewConsumer = 0;
-      await otherRabbit.registerTaskConsumer(taskName, async () => {
+      await otherRabbit.registerTaskConsumer(taskName, () => {
         consumeCountNewConsumer++;
       }, myConsumeOptions);
 

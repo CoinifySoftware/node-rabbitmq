@@ -20,7 +20,7 @@ describe('Integration tests', () => {
       await rabbit.shutdown();
     });
 
-    it('should reconnect and re-attach registered consumers on unexpected disconnect', async () => {
+    it('should reconnect and re-attach registered consumers on unexpected disconnect', () => {
       return new Promise(async (resolve) => {
         let eventConsumed = false;
         let taskConsumed = false;
@@ -28,10 +28,10 @@ describe('Integration tests', () => {
         const eventContext = { eventContext: true };
         const taskContext = { taskContext: true };
 
-        const _consumed = async () => {
+        const _consumed = () => {
           if (eventConsumed && taskConsumed) {
             // If both events were consumed, we can resolve the promise..:!
-            resolve();
+            resolve(undefined);
           }
         };
 
@@ -40,18 +40,18 @@ describe('Integration tests', () => {
         const initialChannel = await rabbit._getChannel();
 
         // Attach an event consumer and a task consumer
-        await rabbit.registerEventConsumer(serviceName + '.my-event', async (c, e) => {
+        await rabbit.registerEventConsumer(serviceName + '.my-event', (c, e) => {
           expect(c).to.deep.equal(eventContext);
           expect(e.eventName).to.equal('my-test-service.my-event');
           eventConsumed = true;
-          await _consumed();
+          _consumed();
         }, consumeOptions);
 
-        await rabbit.registerTaskConsumer('my-task', async (c, t) => {
+        await rabbit.registerTaskConsumer('my-task', (c, t) => {
           expect(c).to.deep.equal(taskContext);
           expect(t.taskName).to.equal('my-test-service.my-task');
           taskConsumed = true;
-          await _consumed();
+          _consumed();
         }, consumeOptions);
 
         // Now we have attached two consumers, time to fake a disconnect:

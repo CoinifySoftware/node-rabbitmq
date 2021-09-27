@@ -33,37 +33,37 @@ describe('Integration tests', () => {
       await rabbit.shutdown();
     });
 
-    it('should be able to publish and consume a single event with a single consumer', async () => {
+    it('should be able to publish and consume a single event with a single consumer', () => {
       return new Promise(async (resolve) => {
-        await rabbit.registerEventConsumer(fullEventName, async (c, e) => {
+        await rabbit.registerEventConsumer(fullEventName, (c, e) => {
           expect(e.eventName).to.equal(fullEventName);
           expect(c).to.deep.equal(context);
 
-          resolve();
+          resolve(undefined);
         }, registerEventConsumerOptions);
         await rabbit.emitEvent(eventName, context, emitEventOptions);
       });
     });
 
-    it('should be able to publish an event with a pre-defined UUID and timestamp', async () => {
+    it('should be able to publish an event with a pre-defined UUID and timestamp', () => {
       const uuid = '12341234-1234-1234-1234-123412341234';
       const time = 1511944077916;
 
       const emitOptions = _.defaults({ uuid, time }, emitEventOptions);
 
       return new Promise(async (resolve) => {
-        await rabbit.registerEventConsumer(fullEventName, async (c, e) => {
+        await rabbit.registerEventConsumer(fullEventName, (c, e) => {
           expect(e.uuid).to.equal(uuid);
           expect(e.time).to.equal(time);
 
-          resolve();
+          resolve(undefined);
         }, registerEventConsumerOptions);
         await rabbit.emitEvent(eventName, context, emitOptions);
       });
 
     });
 
-    it('should be able to publish and consume multiple events with a single consumer', async () => {
+    it('should be able to publish and consume multiple events with a single consumer', () => {
       const eventCount = 3;
 
       return new Promise(async (resolve) => {
@@ -73,14 +73,14 @@ describe('Integration tests', () => {
 
         let eventsConsumed = 0;
 
-        await rabbit.registerEventConsumer(fullEventName, async (c, e) => {
+        await rabbit.registerEventConsumer(fullEventName, (c, e) => {
           expect(e.eventName).to.equal(fullEventName);
           expect(c).to.deep.equal(contexts[eventsConsumed]);
 
           eventsConsumed++;
 
           if (eventsConsumed === eventCount) {
-            resolve();
+            resolve(undefined);
           }
         }, registerEventConsumerOptions);
 
@@ -90,7 +90,7 @@ describe('Integration tests', () => {
       });
     });
 
-    it('should be able to publish a multiple events, load balanced to multiple consumers within the same service', async () => {
+    it('should be able to publish a multiple events, load balanced to multiple consumers within the same service', () => {
       const consumerCount = 3;
       const eventCount = consumerCount * 3;
 
@@ -105,7 +105,7 @@ describe('Integration tests', () => {
 
       return new Promise(async (resolve) => {
         for (const i of consumerIds) {
-          await rabbit.registerEventConsumer<EventContextWithEventNumber>(fullEventName, async (c, e) => { // eslint-disable-line no-loop-func
+          await rabbit.registerEventConsumer<EventContextWithEventNumber>(fullEventName, (c, e) => { // eslint-disable-line no-loop-func
             expect(e.eventName).to.equal(fullEventName);
 
             eventsConsumed.push(c.eventNumber);
@@ -115,7 +115,7 @@ describe('Integration tests', () => {
               const eventsConsumedSorted = _.sortBy(eventsConsumed);
               expect(eventsConsumedSorted).to.deep.equal(eventIds);
 
-              resolve();
+              resolve(undefined);
             }
           }, registerEventConsumerOptions);
         }
@@ -126,7 +126,7 @@ describe('Integration tests', () => {
       });
     });
 
-    it('should be able to publish multiple events, broadcast to multiple consumers from different services', async () => {
+    it('should be able to publish multiple events, broadcast to multiple consumers from different services', () => {
       const consumerCount = 3;
       const eventCount = 3;
 
@@ -144,7 +144,7 @@ describe('Integration tests', () => {
       return new Promise(async (resolve) => {
         for (const i of consumerIds) {
           const consumeOptions = _.defaultsDeep({}, registerEventConsumerOptions, { service: { name: 'service' + i } });
-          await rabbit.registerEventConsumer<EventContextWithEventNumber>(fullEventName, async (c, e) => { // eslint-disable-line no-loop-func
+          await rabbit.registerEventConsumer<EventContextWithEventNumber>(fullEventName, (c, e) => { // eslint-disable-line no-loop-func
             expect(e.eventName).to.equal(fullEventName);
 
             eventsConsumed.push(c.eventNumber);
@@ -164,7 +164,7 @@ describe('Integration tests', () => {
                 expect(eventsConsumedSorted).to.deep.equal(eventIds);
               });
 
-              resolve();
+              resolve(undefined);
             }
           }, consumeOptions);
         }
@@ -175,7 +175,7 @@ describe('Integration tests', () => {
       });
     });
 
-    it('should be able to consume the same event in all instances of the same service', async () => {
+    it('should be able to consume the same event in all instances of the same service', () => {
       const consumerCount = 3;
 
       const consumerIds = _.range(consumerCount);
@@ -187,7 +187,7 @@ describe('Integration tests', () => {
       return new Promise(async (resolve) => {
         for (const i of consumerIds) {
           const consumeOptions = _.defaultsDeep({}, registerEventConsumerOptions, { service: { name: 'my-service' }, uniqueQueue: true });
-          await rabbit.registerEventConsumer<EventContextWithEventNumber>(fullEventName, async (c, e) => { // eslint-disable-line no-loop-func
+          await rabbit.registerEventConsumer<EventContextWithEventNumber>(fullEventName, (c, e) => { // eslint-disable-line no-loop-func
             expect(e.eventName).to.equal(fullEventName);
 
             eventsConsumed++;
@@ -206,7 +206,7 @@ describe('Integration tests', () => {
                 expect(eventsConsumed).to.equal(1);
               });
 
-              resolve();
+              resolve(undefined);
             }
           }, consumeOptions);
         }
@@ -253,7 +253,7 @@ describe('Integration tests', () => {
          * Register consumers
          */
         for (const [ i, consumeKey ] of [ [ 1, consumeKey1 ], [ 2, consumeKey2 ], [ 3, consumeKey3 ], [ 4, consumeKey4 ] ] as const) {
-          await rabbit.registerEventConsumer<EventContextWithEventNumber>(consumeKey, async (context, event) => { // eslint-disable-line no-loop-func
+          await rabbit.registerEventConsumer<EventContextWithEventNumber>(consumeKey, (context, event) => { // eslint-disable-line no-loop-func
             // Store that this event was consumed by this consumer
             eventsConsumedByConsumer[i].push({ context, event });
 
@@ -326,7 +326,7 @@ describe('Integration tests', () => {
             service: { name: 'service' + i }
           }, registerEventConsumerOptions);
 
-          await rabbit.registerEventConsumer(fullEventName, async (context, event) => { // eslint-disable-line no-loop-func
+          await rabbit.registerEventConsumer(fullEventName, (context, event) => { // eslint-disable-line no-loop-func
             expect(event.eventName).to.equal(fullEventName);
 
             // Store that this event was consumed by this consumer
@@ -368,7 +368,7 @@ describe('Integration tests', () => {
           }
         }, consumerOptions);
 
-        await Promise.all(new Array(taskCount).fill(undefined).map(async () => rabbit.emitEvent(eventName, context, emitEventOptions)));
+        await Promise.all(new Array(taskCount).fill(undefined).map(() => rabbit.emitEvent(eventName, context, emitEventOptions)));
       });
 
       // Average timestamp of each group of consumptions
@@ -384,52 +384,14 @@ describe('Integration tests', () => {
       const err = new Error('The error');
       const context = { theContext: true };
 
-      disableFailedMessageQueue(rabbit);
-
-      await new Promise(async (resolve, reject) => {
-        await rabbit.registerEventConsumer(fullEventName, async () => {
-          throw err;
-        }, {
-          ...registerEventConsumerOptions,
-          onError: async params => {
-            try {
-              expect(params).to.containSubset({
-                err,
-                context,
-                event: {
-                  eventName: fullEventName,
-                  context
-                }
-              });
-
-              resolve(undefined);
-            } catch (err) {
-              reject(err);
-            }
-          }
-        });
-
-        await rabbit.emitEvent(eventName, context, emitEventOptions);
-      });
-
-      // Wait a bit to ensure consumer closes
-      await new Promise(resolve => setTimeout(resolve, 25));
-
-      reenableFailedMessageQueue(rabbit);
-    });
-
-    it('should use custom onError function if event consumption throws', async () => {
-      const err = new Error('The error');
-      const context = { theContext: true };
-
-      disableFailedMessageQueue(rabbit);
+      await disableFailedMessageQueue(rabbit);
 
       await new Promise(async (resolve, reject) => {
         await rabbit.registerEventConsumer(fullEventName, () => {
           throw err;
         }, {
           ...registerEventConsumerOptions,
-          onError: async params => {
+          onError: params => {
             try {
               expect(params).to.containSubset({
                 err,
@@ -453,7 +415,45 @@ describe('Integration tests', () => {
       // Wait a bit to ensure consumer closes
       await new Promise(resolve => setTimeout(resolve, 25));
 
-      reenableFailedMessageQueue(rabbit);
+      await reenableFailedMessageQueue(rabbit);
+    });
+
+    it('should use custom onError function if event consumption throws', async () => {
+      const err = new Error('The error');
+      const context = { theContext: true };
+
+      await disableFailedMessageQueue(rabbit);
+
+      await new Promise(async (resolve, reject) => {
+        await rabbit.registerEventConsumer(fullEventName, () => {
+          throw err;
+        }, {
+          ...registerEventConsumerOptions,
+          onError: params => {
+            try {
+              expect(params).to.containSubset({
+                err,
+                context,
+                event: {
+                  eventName: fullEventName,
+                  context
+                }
+              });
+
+              resolve(undefined);
+            } catch (err) {
+              reject(err);
+            }
+          }
+        });
+
+        await rabbit.emitEvent(eventName, context, emitEventOptions);
+      });
+
+      // Wait a bit to ensure consumer closes
+      await new Promise(resolve => setTimeout(resolve, 25));
+
+      await reenableFailedMessageQueue(rabbit);
     });
 
   });

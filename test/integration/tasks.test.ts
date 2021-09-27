@@ -28,36 +28,36 @@ describe('Integration tests', () => {
       await rabbit.shutdown();
     });
 
-    it('should be able to enqueue and consume a single task with a single consumer', async () => {
+    it('should be able to enqueue and consume a single task with a single consumer', () => {
       return new Promise(async (resolve) => {
-        await rabbit.registerTaskConsumer(taskName, async (c, t) => {
+        await rabbit.registerTaskConsumer(taskName, (c, t) => {
           expect(t.taskName).to.equal(fullTaskName);
           expect(c).to.deep.equal(context);
 
-          resolve();
+          resolve(undefined);
         }, registerTaskConsumerOptions);
         await rabbit.enqueueTask(fullTaskName, context, enqueueTaskOptions);
       });
     });
 
-    it('should be able to enqueue a task with a pre-defined UUID and timestamp', async () => {
+    it('should be able to enqueue a task with a pre-defined UUID and timestamp', () => {
       const uuid = '12341234-1234-1234-1234-123412341234';
       const time = 1511944077916;
 
       const enqueueOptions = _.defaults({ uuid, time }, enqueueTaskOptions);
 
       return new Promise(async (resolve) => {
-        await rabbit.registerTaskConsumer(taskName, async (c, t) => {
+        await rabbit.registerTaskConsumer(taskName, (c, t) => {
           expect(t.uuid).to.equal(uuid);
           expect(t.time).to.equal(time);
 
-          resolve();
+          resolve(undefined);
         }, registerTaskConsumerOptions);
         await rabbit.enqueueTask(fullTaskName, context, enqueueOptions);
       });
     });
 
-    it('should be able to enqueue and consume multiple tasks with a single consumer', async () => {
+    it('should be able to enqueue and consume multiple tasks with a single consumer', () => {
       const taskCount = 3;
 
       return new Promise(async (resolve) => {
@@ -67,14 +67,14 @@ describe('Integration tests', () => {
 
         let tasksConsumed = 0;
 
-        await rabbit.registerTaskConsumer(taskName, async (c, t) => {
+        await rabbit.registerTaskConsumer(taskName, (c, t) => {
           expect(t.taskName).to.equal(fullTaskName);
           expect(c).to.deep.equal(contexts[tasksConsumed]);
 
           tasksConsumed++;
 
           if (tasksConsumed === taskCount) {
-            resolve();
+            resolve(undefined);
           }
         }, registerTaskConsumerOptions);
 
@@ -84,7 +84,7 @@ describe('Integration tests', () => {
       });
     });
 
-    it('should be able to enqueue a multiple tasks, load balanced to multiple consumers within the same service', async () => {
+    it('should be able to enqueue a multiple tasks, load balanced to multiple consumers within the same service', () => {
       const consumerCount = 3;
       const taskCount = consumerCount * 3;
 
@@ -109,7 +109,7 @@ describe('Integration tests', () => {
               const tasksConsumedSorted = _.sortBy(tasksConsumed);
               expect(tasksConsumedSorted).to.deep.equal(taskIds);
 
-              resolve();
+              resolve(undefined);
             }
           }, registerTaskConsumerOptions);
         }
@@ -120,7 +120,7 @@ describe('Integration tests', () => {
       });
     });
 
-    it('should be able to consume the same task in all instances of the same service', async () => {
+    it('should be able to consume the same task in all instances of the same service', () => {
       const consumerCount = 3;
 
       const consumerIds = _.range(consumerCount);
@@ -151,7 +151,7 @@ describe('Integration tests', () => {
                 expect(tasksConsumed).to.equal(1);
               });
 
-              resolve();
+              resolve(undefined);
             }
           }, consumeOptions);
         }
@@ -160,7 +160,7 @@ describe('Integration tests', () => {
       });
     });
 
-    it('should retry a task whose processing function rejected', async () => {
+    it('should retry a task whose processing function rejected', () => {
       return new Promise(async (resolve) => {
 
         // Retry 4 times with 0.25 second delay
@@ -170,7 +170,7 @@ describe('Integration tests', () => {
         let startTime = Date.now();
         let attempt = 0;
 
-        await rabbit.registerTaskConsumer(taskName, async (c, e) => {
+        await rabbit.registerTaskConsumer(taskName, (c, e) => {
           expect(e.taskName).to.equal(fullTaskName);
           expect(e.attempts).to.equal(attempt);
           expect(c).to.deep.equal(context);
@@ -191,7 +191,7 @@ describe('Integration tests', () => {
           if (attempt <= maxAttempts) {
             throw new Error('Processing function rejected');
           } else {
-            resolve();
+            resolve(undefined);
           }
         }, consumeOptions);
         await rabbit.enqueueTask(fullTaskName, context, enqueueTaskOptions);
@@ -217,7 +217,7 @@ describe('Integration tests', () => {
           }
         }, consumerOptions);
 
-        await Promise.all(new Array(taskCount).fill(undefined).map(async () => rabbit.enqueueTask(fullTaskName, context, enqueueTaskOptions)));
+        await Promise.all(new Array(taskCount).fill(undefined).map(() => rabbit.enqueueTask(fullTaskName, context, enqueueTaskOptions)));
       });
 
       // Average timestamp of each group of consumptions
@@ -229,13 +229,13 @@ describe('Integration tests', () => {
       }
     });
 
-    it('should be able to enqueue a delayed task', async () => {
+    it('should be able to enqueue a delayed task', () => {
       const delayMillis = 1000;
       const enqueueOptions = Object.assign({ delayMillis }, enqueueTaskOptions);
       let enqueueTime: number;
 
       return new Promise(async (resolve) => {
-        await rabbit.registerTaskConsumer(taskName, async (c, t) => {
+        await rabbit.registerTaskConsumer(taskName, (c, t) => {
           const consumeTime = Date.now();
 
           expect(t.taskName).to.equal(fullTaskName);
@@ -243,7 +243,7 @@ describe('Integration tests', () => {
           expect(c).to.deep.equal(context);
           expect(consumeTime - enqueueTime).to.be.closeTo(delayMillis, 50);
 
-          resolve();
+          resolve(undefined);
         }, registerTaskConsumerOptions);
         enqueueTime = Date.now();
         await rabbit.enqueueTask(fullTaskName, context, enqueueOptions);
@@ -254,53 +254,53 @@ describe('Integration tests', () => {
       const err = new Error('The error');
       const context = { theContext: true };
 
-      disableFailedMessageQueue(rabbit);
-
-      await new Promise(async (resolve, reject) => {
-        await rabbit.registerTaskConsumer(taskName, async () => {
-          throw err;
-        }, {
-          ...registerTaskConsumerOptions,
-          onError: async params => {
-            try {
-              expect(params).to.containSubset({
-                err,
-                context,
-                task: {
-                  taskName: fullTaskName,
-                  context
-                }
-              });
-
-              resolve(undefined);
-            } catch (err) {
-              reject(err);
-            }
-          }
-        });
-
-
-        await rabbit.enqueueTask(fullTaskName, context, enqueueTaskOptions);
-      });
-
-      // Wait a bit to ensure consumer closes
-      await new Promise(resolve => setTimeout(resolve, 25));
-
-      reenableFailedMessageQueue(rabbit);
-    });
-
-    it('should use custom onError function if task consumption throws', async () => {
-      const err = new Error('The error');
-      const context = { theContext: true };
-
-      disableFailedMessageQueue(rabbit);
+      await disableFailedMessageQueue(rabbit);
 
       await new Promise(async (resolve, reject) => {
         await rabbit.registerTaskConsumer(taskName, () => {
           throw err;
         }, {
           ...registerTaskConsumerOptions,
-          onError: async params => {
+          onError: params => {
+            try {
+              expect(params).to.containSubset({
+                err,
+                context,
+                task: {
+                  taskName: fullTaskName,
+                  context
+                }
+              });
+
+              resolve(undefined);
+            } catch (err) {
+              reject(err);
+            }
+          }
+        });
+
+
+        await rabbit.enqueueTask(fullTaskName, context, enqueueTaskOptions);
+      });
+
+      // Wait a bit to ensure consumer closes
+      await new Promise(resolve => setTimeout(resolve, 25));
+
+      await reenableFailedMessageQueue(rabbit);
+    });
+
+    it('should use custom onError function if task consumption throws', async () => {
+      const err = new Error('The error');
+      const context = { theContext: true };
+
+      await disableFailedMessageQueue(rabbit);
+
+      await new Promise(async (resolve, reject) => {
+        await rabbit.registerTaskConsumer(taskName, () => {
+          throw err;
+        }, {
+          ...registerTaskConsumerOptions,
+          onError: params => {
             try {
               expect(params).to.containSubset({
                 err,
@@ -324,7 +324,7 @@ describe('Integration tests', () => {
       // Wait a bit to ensure consumer closes
       await new Promise(resolve => setTimeout(resolve, 25));
 
-      reenableFailedMessageQueue(rabbit);
+      await reenableFailedMessageQueue(rabbit);
     });
 
   });

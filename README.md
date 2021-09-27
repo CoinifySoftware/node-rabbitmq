@@ -1,4 +1,4 @@
-# node-rabbitmq 
+# node-rabbitmq
 [![npm version](https://badge.fury.io/js/%40coinify%2Frabbitmq.svg)](https://badge.fury.io/js/%40coinify%2Frabbitmq)
 
 ## Suggestions for improvement
@@ -19,14 +19,20 @@ Re-connection will be attempted using fibonacci backoff with a maximum delay of 
 will be used between re-connection failures: 1, 1, 2, 3, 5, 10, 20, 30, 50, 60, 60, 60...
 
 ## `CoinifyRabbit` API
+#### JavaScript
 ```js
 const CoinifyRabbit = require('@coinify/rabbitmq');
+```
+
+#### TypeScript
+```ts
+import CoinifyRabbit from '@coinify/rabbitmq';
 ```
 
 ### `new CoinifyRabbit(options)`
 _Creates a new instance of `CoinifyRabbit`_
 
-The `options` argument overrides default configuration options that are specified in the `static getDefaultConfig()` function in `lib/CoinifyRabbit.js`.
+The `options` argument overrides default configuration options that are specified in the `DEFAULT_CONFIGURATION` object in `src/CoinifyRabbitConfiguration.ts`.
 
 ```js
 const options = {

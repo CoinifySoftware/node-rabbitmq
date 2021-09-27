@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2018",
+    "types": ["node"],
+    "outDir": "dist",
+    "allowJs": true,
+    "rootDir": ".",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "declaration": true
+  },
+  "include": ["src", "test", "index.ts", ".eslintrc.js", "scripts/**.js"],
+  "exclude": [
+    "node_modules",
+    "build"
+  ]
+}

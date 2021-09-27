@@ -1,15 +1,13 @@
-'use strict';
-
-const sinon = require('sinon');
-
-const CoinifyRabbit = require('../../../lib/CoinifyRabbit');
+import { expect } from 'chai';
+import sinon from 'sinon';
+import CoinifyRabbit from '../../../src/CoinifyRabbit';
 
 describe('CoinifyRabbit', () => {
 
   describe('#_onChannelClosed', () => {
 
-    let _connectWithBackoffStub,
-      rabbit;
+    let _connectWithBackoffStub: sinon.SinonStub,
+      rabbit: any;
 
     beforeEach(() => {
       rabbit = new CoinifyRabbit();
@@ -24,7 +22,7 @@ describe('CoinifyRabbit', () => {
 
     it('should do nothing if shutdown was initiated', async () => {
       // Expected closing of channel
-      rabbit._isShuttingDown = true;
+      rabbit.isShuttingDown = true;
 
       await rabbit._onChannelClosed();
 
@@ -33,18 +31,18 @@ describe('CoinifyRabbit', () => {
 
     it('should do nothing on unexpected closing if there are no registered consumers', async () => {
       // Unexpected closing of channel
-      rabbit._isShuttingDown = false;
+      rabbit.isShuttingDown = false;
 
       await rabbit._onChannelClosed();
 
       expect(_connectWithBackoffStub.notCalled).to.equal(true);
     });
 
-    it('should call _connectWithBackoff() on unexpected closing if there are registered consumers', async() => {
+    it('should call _connectWithBackoff() on unexpected closing if there are registered consumers', async () => {
       // Unexpected closing of channel
-      rabbit._isShuttingDown = false;
+      rabbit.isShuttingDown = false;
       // Function only checks if _registeredConsumers is non-empty. Adding an empty object will do just fine.
-      rabbit._registeredConsumers.push({});
+      rabbit.consumers.push({});
 
       await rabbit._onChannelClosed();
 

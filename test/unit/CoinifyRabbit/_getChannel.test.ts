@@ -1,34 +1,31 @@
-'use strict';
-
-const sinon = require('sinon'),
-  EventEmitter = require('events');
-
-const CoinifyRabbit = require('../../../lib/CoinifyRabbit');
-
-const amqplib = require('amqplib');
+import amqplib from 'amqplib';
+import { expect } from 'chai';
+import EventEmitter from 'events';
+import sinon from 'sinon';
+import CoinifyRabbit from '../../../src/CoinifyRabbit';
 
 describe('CoinifyRabbit', () => {
 
   describe('#_getChannel', () => {
 
-    let _getConnectionStub,
-      _onChannelOpenedStub,
-      _onChannelClosedStub,
-      createChannelStub,
-      amqpConnection,
-      rabbit;
+    let _getConnectionStub: sinon.SinonStub,
+      _onChannelOpenedStub: sinon.SinonStub,
+      _onChannelClosedStub: sinon.SinonStub,
+      createChannelStub: sinon.SinonStub,
+      amqpConnection: amqplib.Connection,
+      rabbit: CoinifyRabbit;
 
     beforeEach(() => {
       rabbit = new CoinifyRabbit();
 
       createChannelStub = sinon.stub();
-      amqpConnection = { createChannel: createChannelStub };
+      amqpConnection = { createChannel: createChannelStub } as any;
 
       _getConnectionStub = sinon.stub(rabbit, '_getConnection');
       _getConnectionStub.resolves(amqpConnection);
-      _onChannelOpenedStub = sinon.stub(rabbit, '_onChannelOpened');
+      _onChannelOpenedStub = sinon.stub(rabbit as any, '_onChannelOpened');
       _onChannelOpenedStub.resolves();
-      _onChannelClosedStub = sinon.stub(rabbit, '_onChannelClosed');
+      _onChannelClosedStub = sinon.stub(rabbit as any, '_onChannelClosed');
       _onChannelClosedStub.resolves();
     });
 
@@ -121,7 +118,7 @@ describe('CoinifyRabbit', () => {
       expect(_onChannelClosedStub.calledOnce).to.equal(true);
 
       // Cached channel should be gone
-      expect(rabbit._channel).to.equal(undefined);
+      expect((rabbit as any)._channel).to.equal(undefined);
     });
 
   });

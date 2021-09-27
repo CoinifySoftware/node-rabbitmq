@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2018",
+    "types": ["node"],
+    "outDir": "dist",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "declaration": true
+  },
+  "include": ["src", "test"],
+  "exclude": [
+    "node_modules",
+    "build"
+  ]
+}

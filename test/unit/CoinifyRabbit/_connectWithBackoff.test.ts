@@ -1,18 +1,16 @@
-'use strict';
-
-const sinon = require('sinon'),
-  backoff = require('backoff'),
-  EventEmitter = require('events');
-
-const CoinifyRabbit = require('../../../lib/CoinifyRabbit');
+import backoff from 'backoff';
+import { expect } from 'chai';
+import EventEmitter from 'events';
+import sinon from 'sinon';
+import CoinifyRabbit from '../../../src/CoinifyRabbit';
 
 describe('CoinifyRabbit', () => {
 
   describe('#_connectWithBackoff', () => {
 
-    let _getChannelStub,
-      backoffFibonacciStub,
-      rabbit;
+    let _getChannelStub: sinon.SinonStub,
+      backoffFibonacciStub: sinon.SinonStub,
+      rabbit: CoinifyRabbit;
 
     beforeEach(() => {
       rabbit = new CoinifyRabbit();
@@ -37,13 +35,14 @@ describe('CoinifyRabbit', () => {
       _getChannelStub.rejects(rejectError);
       _getChannelStub.onCall(backoffAttempts - 1).resolves();
 
-      const fibonacci = new EventEmitter();
+      // Sorry about that ugly type
+      const fibonacci: EventEmitter | ( any & { backoff: any } ) = new EventEmitter();
       fibonacci.backoff = sinon.stub();
       fibonacci.backoff.returns();
 
       backoffFibonacciStub.returns(fibonacci);
 
-      await rabbit._connectWithBackoff();
+      await (rabbit as any)._connectWithBackoff();
 
       // Backoff initiated
       expect(backoffFibonacciStub.calledOnce).to.equal(true);

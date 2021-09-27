@@ -1,7 +1,7 @@
-'use strict';
-
-const CoinifyRabbit = require('../../lib/CoinifyRabbit');
-const { createRabbitMQTestInstance } = require('../bootstrap.test');
+import { expect } from 'chai';
+import CoinifyRabbit from '../../src/CoinifyRabbit';
+import Task from '../../src/messageTypes/Task';
+import { createRabbitMQTestInstance } from '../bootstrap.test';
 
 describe('Integration tests', () => {
 
@@ -10,9 +10,8 @@ describe('Integration tests', () => {
     const context = { myContext: false };
     const serviceName = 'my-test-service';
     const registerConsumerOptions = { exchange: { autoDelete: true }, queue: { autoDelete: true } };
-    const enqueueMessageOptions = { exchange: { autoDelete: true } };
 
-    let rabbit;
+    let rabbit: CoinifyRabbit;
     before(() => {
       rabbit = createRabbitMQTestInstance({ service: { name: serviceName } });
     });
@@ -25,12 +24,12 @@ describe('Integration tests', () => {
       const eventName = 'my-failed-message' + Math.random();
       const fullEventName = serviceName + '.' + eventName;
 
-      return new Promise(async (resolve, reject) => {
+      return new Promise(async (resolve) => {
         await rabbit.registerEventConsumer(fullEventName, async (c, e) => {
           expect(e.eventName).to.equal(fullEventName);
           expect(c).to.deep.equal(context);
 
-          resolve();
+          resolve(undefined);
         }, registerConsumerOptions);
 
         // Set routing key events.' + options.service.name + '.' + eventKey
@@ -43,7 +42,7 @@ describe('Integration tests', () => {
           attempts: 12
         };
 
-        await rabbit.enqueueMessage(routingKey, messageObject, enqueueMessageOptions);
+        await rabbit.enqueueMessage(routingKey, messageObject);
       });
     });
 
@@ -56,11 +55,11 @@ describe('Integration tests', () => {
           expect(t.taskName).to.equal(fullTaskName);
           expect(c).to.deep.equal(context);
 
-          resolve();
+          resolve(undefined);
         }, registerConsumerOptions);
 
         const queueName = 'tasks.my-test-service.' + taskName;
-        const messageObject = {
+        const messageObject: Task = {
           context,
           taskName: fullTaskName,
           uuid: 'd51bbaed-1ee8-4bb6-a739-cee5b56ee518',
@@ -69,7 +68,7 @@ describe('Integration tests', () => {
           origin: 'another-service'
         };
 
-        await rabbit.enqueueMessage(queueName, messageObject, enqueueMessageOptions);
+        await rabbit.enqueueMessage(queueName, messageObject);
       });
     });
   });

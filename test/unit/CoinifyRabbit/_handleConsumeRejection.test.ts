@@ -1,24 +1,23 @@
-'use strict';
-
-const CoinifyRabbit = require('../../../lib/CoinifyRabbit'),
-  sinon = require('sinon'),
-  _ = require('lodash');
+import { expect } from 'chai';
+import _ from 'lodash';
+import sinon from 'sinon';
+import CoinifyRabbit from '../../../src/CoinifyRabbit';
 
 describe('CoinifyRabbit', () => {
 
   describe('#_handleConsumeRejection', () => {
 
-    let _getChannelStub,
-      channelPublishStub,
-      _assertRetryExchangeAndQueueStub,
-      _assertDeadLetterExchangeAndQueueStub,
-      _decideConsumerRetryStub,
+    let _getChannelStub: sinon.SinonStub,
+      channelPublishStub: sinon.SinonStub,
+      _assertRetryExchangeAndQueueStub: sinon.SinonStub,
+      _assertDeadLetterExchangeAndQueueStub: sinon.SinonStub,
+      _decideConsumerRetryStub: sinon.SinonStub,
 
-      rabbit;
+      rabbit: CoinifyRabbit;
 
-    let message,
-      task,
-      options;
+    let message: any,
+      task: any,
+      options: any;
 
     const consumeError = new Error('The error');
     const retryExchangeName = 'the-exchange';
@@ -49,9 +48,9 @@ describe('CoinifyRabbit', () => {
       channelPublishStub.resolves(true);
       _getChannelStub = sinon.stub(rabbit, '_getChannel');
       _getChannelStub.resolves({ publish: channelPublishStub });
-      _assertRetryExchangeAndQueueStub = sinon.stub(rabbit, '_assertRetryExchangeAndQueue');
+      _assertRetryExchangeAndQueueStub = sinon.stub(rabbit as any, '_assertRetryExchangeAndQueue');
       _assertRetryExchangeAndQueueStub.resolves({ retryExchangeName, retryQueueName });
-      _assertDeadLetterExchangeAndQueueStub = sinon.stub(rabbit, '_assertDeadLetterExchangeAndQueue');
+      _assertDeadLetterExchangeAndQueueStub = sinon.stub(rabbit as any, '_assertDeadLetterExchangeAndQueue');
       _assertDeadLetterExchangeAndQueueStub.resolves(retryExchangeName);
       _decideConsumerRetryStub = sinon.stub(CoinifyRabbit, '_decideConsumerRetry');
       _decideConsumerRetryStub.returns({ shouldRetry: false, delaySeconds: 0 });
@@ -64,31 +63,12 @@ describe('CoinifyRabbit', () => {
       _decideConsumerRetryStub.restore();
     });
 
-    it('should call options.onError function if provided', async () => {
-      options.onError = sinon.stub();
-      options.onError.resolves();
-
-      await rabbit._handleConsumeRejection(message, 'task', task, consumeError, options);
-
-      expect(options.onError.calledOnce).to.equal(true);
-      expect(options.onError.firstCall.args).to.have.lengthOf(1);
-      const argObject = options.onError.firstCall.args[0];
-
-      expect(argObject).to.containSubset({
-        err: consumeError,
-        context: task.context,
-        task,
-        willRetry: false,
-        delaySeconds: 0
-      });
-    });
-
     it('should re-publish to retry queue if _decideConsumerRetry() returns shouldRetry: true', async () => {
       const delaySeconds = 6660;
 
       _decideConsumerRetryStub.returns({ shouldRetry: true, delaySeconds });
 
-      await rabbit._handleConsumeRejection(message, 'task', task, consumeError, options);
+      await (rabbit as any)._handleConsumeRejection(message, 'task', task, consumeError, options);
 
       expect(_decideConsumerRetryStub.calledOnce).to.equal(true);
       expect(_decideConsumerRetryStub.firstCall.args).to.deep.equal([ task.attempts, options.retry ]);
@@ -109,7 +89,7 @@ describe('CoinifyRabbit', () => {
     });
 
     it('should re-publish to dead letter queue if _decideConsumerRetry() returns shouldRetry: false', async () => {
-      await rabbit._handleConsumeRejection(message, 'task', task, consumeError, options);
+      await (rabbit as any)._handleConsumeRejection(message, 'task', task, consumeError, options);
 
       expect(_decideConsumerRetryStub.calledOnce).to.equal(true);
       expect(_decideConsumerRetryStub.firstCall.args).to.deep.equal([ task.attempts, options.retry ]);
@@ -131,13 +111,13 @@ describe('CoinifyRabbit', () => {
 
     it('should re-publish to dead letter queue if consumeError contains noRetry: true property', async () => {
       const consumeError = new Error('Error that we should not retry on');
-      consumeError.noRetry = true;
+      (consumeError as any).noRetry = true;
 
       // _decideConsumerRetry returns shouldRetry: false, but we want to override it
       const delaySeconds = 6660;
       _decideConsumerRetryStub.returns({ shouldRetry: true, delaySeconds });
 
-      await rabbit._handleConsumeRejection(message, 'task', task, consumeError, options);
+      await (rabbit as any)._handleConsumeRejection(message, 'task', task, consumeError, options);
 
       expect(_assertRetryExchangeAndQueueStub.notCalled).to.equal(true);
 
@@ -153,7 +133,7 @@ describe('CoinifyRabbit', () => {
     it('should reject if type is neither task nor event', async () => {
       const errMsg = 'Invalid type. Given: invalid, allowed: [event, task]';
 
-      expect(rabbit._handleConsumeRejection(message, 'invalid', task, consumeError, options))
+      await expect((rabbit as any)._handleConsumeRejection(message, 'invalid', task, consumeError, options))
         .to.eventually
         .be.rejectedWith(errMsg)
         .and.be.an.instanceOf(Error);

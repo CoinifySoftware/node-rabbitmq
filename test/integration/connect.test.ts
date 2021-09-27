@@ -1,23 +1,19 @@
-'use strict';
-
-const CoinifyRabbit = require('../../lib/CoinifyRabbit');
-const { createRabbitMQTestInstance } = require('../bootstrap.test');
+import { expect } from 'chai';
+import CoinifyRabbit from '../../src/CoinifyRabbit';
+import { createRabbitMQTestInstance } from '../bootstrap.test';
 
 describe('Integration tests', () => {
   describe('Connection', () => {
 
-    let taskName, fullTaskName;
     const serviceName = 'my-test-service';
 
     const enqueueOptions = { exchange: { autoDelete: true } };
     const consumeOptions = { exchange: { autoDelete: true }, queue: { autoDelete: true } };
 
-    let rabbit;
+    let rabbit: CoinifyRabbit;
 
     beforeEach(() => {
       rabbit = createRabbitMQTestInstance({ service: { name: serviceName } });
-      taskName = 'my-task' + Math.random();
-      fullTaskName = serviceName + '.' + taskName;
     });
 
     afterEach(async () => {
@@ -59,7 +55,7 @@ describe('Integration tests', () => {
         }, consumeOptions);
 
         // Now we have attached two consumers, time to fake a disconnect:
-        rabbit._conn.connection.onSocketError(new Error('my err'));
+        (rabbit as any)._conn.connection.onSocketError(new Error('my err'));
 
         // Wait a moment
         await new Promise(resolve => setTimeout(resolve, 250));
@@ -82,10 +78,10 @@ describe('Integration tests', () => {
       await rabbit.shutdown();
 
       // No connections/channels nor attempts to connect
-      expect(rabbit._conn).to.equal(undefined);
-      expect(rabbit._getConnectionPromise).to.equal(undefined);
-      expect(rabbit._channel).to.equal(undefined);
-      expect(rabbit._getChannelPromise).to.equal(undefined);
+      expect((rabbit as any)._conn).to.equal(undefined);
+      expect((rabbit as any)._getConnectionPromise).to.equal(undefined);
+      expect((rabbit as any)._channel).to.equal(undefined);
+      expect((rabbit as any)._getChannelPromise).to.equal(undefined);
     });
 
   });

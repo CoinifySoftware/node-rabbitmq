@@ -1,15 +1,42 @@
+/* eslint-disable @typescript-eslint/member-ordering */
 'use strict';
 
-const _ = require('lodash'),
-  amqplib = require('amqplib'),
-  backoff = require('backoff'),
-  consoleLogLevel = require('console-log-level'),
-  crypto = require('crypto'),
-  uuid = require('uuid'),
-  util = require('util'),
-  EventEmitter = require('events');
+import _ from 'lodash';
+import amqplib from 'amqplib';
+import backoff from 'backoff';
+import consoleLogLevel from 'console-log-level';
+import crypto from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
+import util from 'util';
+import EventEmitter from 'events';
+import CoinifyRabbitConfiguration, { CoinifyRabbitConnectionConfiguration, DEFAULT_CONFIGURATION } from './CoinifyRabbitConfiguration';
+import Logger from './interfaces/Logger';
+import DeepPartial from './DeepPartial';
+import { EnqueueMessageOptions, RetryConfiguration } from './types';
+import Event, { EventConsumer, EventConsumerFunction, OnEventErrorFunctionParams, RegisterEventConsumerOptions } from './messageTypes/Event';
+import Task, { OnTaskErrorFunctionParams, RegisterTaskConsumerOptions, TaskConsumer, TaskConsumerFunction } from './messageTypes/Task';
+import { FailedMessage, FailedMessageConsumer, FailedMessageConsumerFunction, RegisterFailedMessageConsumerOptions } from './messageTypes/FailedMessage';
 
-class CoinifyRabbit {
+export interface CoinifyRabbitConstructorOptions extends DeepPartial<CoinifyRabbitConfiguration> {
+  logger?: Logger;
+}
+
+type Consumer = EventConsumer | TaskConsumer | FailedMessageConsumer;
+type ConsumerFunction<Context = any> = EventConsumerFunction<Context> | TaskConsumerFunction<Context> | FailedMessageConsumerFunction;
+type RegisterConsumerOptions = RegisterEventConsumerOptions | RegisterTaskConsumerOptions;
+
+type ConsumeMessageOptions = RegisterConsumerOptions & {
+  queueName: string;
+};
+
+export default class CoinifyRabbit extends EventEmitter {
+  private config: CoinifyRabbitConfiguration;
+  private logger: Logger;
+  private consumers: Consumer[] = [];
+  private activeMessageConsumptions: (Event | Task | FailedMessage)[] = [];
+
+  private isShuttingDown = false;
+
   /**
    * Construct CoinifyRabbit object.
    *
@@ -20,125 +47,52 @@ class CoinifyRabbit {
    * @param {string} options.service.name Service name, used to group consumers from the same service together.
    *
    */
-  constructor(options = {}) {
-    options = _.clone(options);
-    this._config = _.defaultsDeep({}, options, CoinifyRabbit.getDefaultConfig());
+  constructor(options?: CoinifyRabbitConstructorOptions) {
+    super();
 
-    this._logger = options.logger || consoleLogLevel({ level: _.get(this._config, 'defaultLogLevel') });
-    _.pull(options, [ 'logger' ]);
+    const { logger, ...config } = options ?? {};
+    this.config = _.defaultsDeep({}, config, DEFAULT_CONFIGURATION);
 
-    if (!_.has(this._config, 'service.name')) {
+    this.logger = logger ?? ( consoleLogLevel({ level: this.config.defaultLogLevel }) as Logger );
+
+    if (!this.config.service.name) {
       throw new Error('options.service.name must be set');
     }
-
-    this._isShuttingDown = false;
-
-    /**
-     * Array of registered consumers in the current channel.
-     *
-     * 'key' property for 'event' type is eventKey, for 'task' type it is taskName
-     *
-     * Note: This array is cleared by the _onChannelClosed() function
-     *
-     * @type {{type: 'event'|'task', consumerTag: string, key: string, consumeFn: function, options: object}[]}
-     * @private
-     */
-    this._registeredConsumers = [];
-
-    /**
-     * Messages that are currently being consumed
-     *
-     * @type {{context: object, uuid: string, time: int, eventName: string|undefined, taskName: string|undefined}}
-     * @private
-     */
-    this._activeMessageConsumptions = [];
-  }
-
-  /**
-   * Returns an object with default configuration for this module
-   *
-   * @returns {object}
-   */
-  static getDefaultConfig() {
-    return {
-      connection: {
-        host: process.env.RABBITMQ_HOST || 'localhost',
-        port: process.env.RABBITMQ_PORT || 5672,
-        protocol: 'amqp',
-        vhost: process.env.RABBITMQ_VHOST || '',
-        username: process.env.RABBITMQ_USERNAME || 'guest',
-        password: process.env.RABBITMQ_PASSWORD || 'guest'
-      },
-      channel: {
-        prefetch: 16
-      },
-      service: {
-        name: 'defaultService'
-      },
-      exchanges: {
-        retry: '_retry',
-        tasksTopic: 'tasks.topic',
-        delayed: '_delayed',
-        failed: '_failed',
-        eventsTopic: 'events.topic'
-      },
-      queues: {
-        retryPrefix: '_retry',
-        delayedTaskPrefix: '_delay.tasks',
-        failed: '_failed'
-      },
-      consumer: {
-        prefetch: 2
-      },
-      defaultLogLevel: 'error'
-    };
   }
 
   /**
    * Emit an event to the global event topic exchange
    *
    * The full event name is used as the routing key
-   *
-   * @param {string} eventName Name of event to emit. Will be prefixed with '<service.name>.'
-   * @param {object} context Object of context data to emit along with the event
-   * @param {object} options Object of optional arguments
-   * @param {string} options.uuid Pre-defined UUID to use for the task
-   * @param {number} options.time Pre-defined timestamp to use for the task
-   * @param {object} options.exchange Object of options to pass to amqplib's assertExchange()
-   * @param {boolean} options.exchange.durable If true, the exchange will survive broker restarts. Defaults to true
-   * @param {boolean} options.exchange.autoDelete If true, the exchange will be destroyed once the number of bindings
-   *                                              for which it is the source drop to zero. Defaults to false.
-   * @param {string} options.service.name Custom service.name to use for the RabbitMQ queue name, useful for testing.
-   * @return {Promise<{eventName, context, uuid, time}>}
    */
-  async emitEvent(eventName, context, options = {}) {
-    const serviceName = _.get(_.defaultsDeep({}, options, this._config), 'service.name');
+  async emitEvent(eventName: string, context: unknown, options?: EnqueueMessageOptions): Promise<Event> {
+    const serviceName = options?.service?.name ?? this.config.service.name;
+
     // Prefix with service name and a dot to get full event name
-    const fullEventName = serviceName ?
-      serviceName + '.' + eventName :
-      eventName;
-    this._logger.trace({ fullEventName, context, options }, 'emitEvent()');
+    const fullEventName = serviceName ? serviceName + '.' + eventName : eventName;
+
+    this.logger.trace({ fullEventName, context, options }, 'emitEvent()');
     const channel = await this._getChannel();
 
-    const exchangeName = _.get(this._config, 'exchanges.eventsTopic');
-    await channel.assertExchange(exchangeName, 'topic', _.get(options, 'exchange', {}));
+    const exchangeName = this.config.exchanges.eventsTopic;
+    await channel.assertExchange(exchangeName, 'topic', options?.exchange);
 
-    const event = {
+    const event: Event = {
       eventName: fullEventName,
       context,
-      uuid: options.uuid || uuid.v4(),
-      time: options.time ? new Date(options.time).getTime() : Date.now(),
+      uuid: options?.uuid ?? uuidv4(),
+      time: options?.time ? new Date(options.time).getTime() : Date.now(),
       attempts: 0
     };
 
     const message = Buffer.from(JSON.stringify(event));
 
-    const publishResult = await channel.publish(exchangeName, fullEventName, message);
+    const publishResult = channel.publish(exchangeName, fullEventName, message);
     if (!publishResult) {
       throw new Error('channel.publish() resolved to ' + JSON.stringify(publishResult));
     }
 
-    this._logger.info({ event, exchangeName, options }, 'Event emitted');
+    this.logger.info({ event, exchangeName, options }, 'Event emitted');
 
     return event;
   }
@@ -150,80 +104,39 @@ class CoinifyRabbit {
    *   Consumers with the same service.name will consume from the same queue (each event will be consumed once).
    *   Consumers with different service.name will consume from different queues (each event will be consumed once per service.name)
    *
-   * @param {string} eventKey Name of event to consume, allowing for wildcards (See rules for RabbitMQ topic exchange)
-   * @param {function<Promise>} consumeFn Function that will be called for each event to consume.
-   *                                      The following arguments are passed to the function:
-   *                                      - {object} context Context for the event
-   *                                      - {object} event Other event data, such as eventName, uuid, time
-   * @param {object} options Object of optional arguments
-   * @param {string} options.consumerTag Explicit consumer tag to use
-   * @param {function<Promise>} options.onCancel Function which will be called if the consumer was cancelled.
-   *                                             It has not yet been possible to test this functionality.
-   * @param {function<Promise>} options.onError Function which will be called with (err, context, event) if consumeFn rejected.
-   *                                            If this function rejects or is not given, an unhandled rejection will appear.
-   * @param {object} options.queue Object of options to pass to amqplib's assertQueue()
-   * @param {boolean} options.queue.durable If true, the queue will survive broker restarts,
-   *                                        modulo the effects of exclusive and autoDelete;
-   *                                        This defaults to true if not supplied, unlike the others
-   * @param {boolean} options.queue.autoDelete If true, the queue will be destroyed once the number of consumers drops
-   *                                           to zero. Defaults to false.
-   * @param {object} options.exchange Object of options to pass to amqplib's assertExchange()
-   * @param {boolean} options.exchange.durable If true, the exchange will survive broker restarts. Defaults to true
-   * @param {boolean} options.exchange.autoDelete If true, the exchange will be destroyed once the number of bindings
-   *                                              for which it is the source drop to zero. Defaults to false.
-   * @param {boolean} options.uniqueQueue If true, each event consumer in this service will get its own event queue,
-   *                                        causing each instance of the service to consume the event. Defaults to false.
-   *                                        Setting this to true forces queue.autoDelete to true as well.
-   * @param {number} options.consumer.prefetch Sets the limit for number of unacknowledged messages for this consumer.
-   *                                           Defaults to the consumer.prefetch configuration value.
-   *                                           If this option is specified, all calls to this function (and registerEventConsumer)
-   *                                           must be done serially to avoid race conditions, causing incorrect prefetch values to be set
-   * @param {object|false} options.retry Specify how (if at all) performing the task should be retried on failure (if `consumeFn` rejects).
-   * @param {object} options.retry.backoff Backoff configuration for retrying tasks
-   * @param {string} options.retry.backoff.type Type of backoff: 'exponential' or 'fixed'. Defaults to 'fixed'
-   *                                            For exponential backoff, the delay until next retry is calculated as (delay * (base ^ n)),
-   *                                            where n is the current attempt (0-indexed). First retry is thus always after `delay` seconds
-   *                                            For fixed backoff, the delay until next retry is always options.backoff.delay
-   * @param {number} options.retry.backoff.delay Delay in seconds. Defaults to 16 seconds
-   * @param {number} options.retry.backoff.base (Only for exponential backoff) The base number for the exponentiation. Defaults to 2
-   * @param {number} options.retry.maxAttempts The maximum number of retry attempts. Defaults to 12.
-   *                                           If set to 1, the task will at most be run twice:
-   *                                             One for the original attempt, and one retry attempt.
-   *                                           Setting this to 0 is the same as setting options.retry: false
-   * @param {string} options.service.name Custom service.name to use for the RabbitMQ queue name, useful for testing.
-   * @return {Promise<string>} Returns the consumer tag which is needed to cancel the consumer
+   * @returns Consumer tag
    */
-  async registerEventConsumer(eventKey, consumeFn, options = {}) {
-    await CoinifyRabbit.validateConsumerRetryOptions(options.retry);
-    const uniqueQueue = _.get(options, 'uniqueQueue', false);
+  async registerEventConsumer<Context = any>(eventKey: string, consumeFn: EventConsumerFunction<Context>, options?: RegisterEventConsumerOptions): Promise<string> {
+    CoinifyRabbit.validateConsumerRetryOptions(options?.retry);
 
-    const serviceName = _.get(_.defaultsDeep({}, options, this._config), 'service.name');
+    const serviceName = options?.service?.name ?? this.config.service.name;
+    const exchangeName = this.config.exchanges.eventsTopic;
+    const { uniqueQueue = false } = options ?? {};
+
     const eventQueueName = this._getConsumeEventQueueName(eventKey, serviceName, uniqueQueue);
-    const exchangeName = _.get(this._config, 'exchanges.eventsTopic');
 
-    const consumeMessageOptions = _.defaultsDeep({ queueName: eventQueueName }, options);
-
-    this._logger.trace({ eventKey, eventQueueName }, 'registerEventConsumer()');
+    const consumeMessageOptions = { ...options, queueName: eventQueueName };
+    this.logger.trace({ eventKey, eventQueueName }, 'registerEventConsumer()');
 
     const channel = await this._getChannel();
 
-    await channel.assertExchange(exchangeName, 'topic', _.get(options, 'exchange', {}));
+    await channel.assertExchange(exchangeName, 'topic', options?.exchange);
 
-    const queueOptions = _.get(options, 'queue', {});
+    const queueOptions = { ...options?.queue };
     if (uniqueQueue) {
-      _.set(queueOptions, 'autoDelete', true);
+      queueOptions.autoDelete = true;
     }
     const q = await channel.assertQueue(eventQueueName, queueOptions);
     await channel.bindQueue(q.queue, exchangeName, eventKey);
 
-    const prefetch = _.get(_.defaultsDeep({}, options, this._config), 'consumer.prefetch');
+    const prefetch = options?.consumer?.prefetch ?? this.config.consumer.prefetch;
     await channel.prefetch(prefetch, false);
     const { consumerTag } = await channel.consume(q.queue,
       async (message) => this._handleConsumeMessage(message, 'event', consumeMessageOptions, consumeFn),
-      { consumerTag: options.consumerTag }
+      { consumerTag: options?.consumerTag }
     );
 
-    this._registeredConsumers.push({ type: 'event', key: eventKey, consumerTag, consumeFn, options });
+    this.consumers.push({ type: 'event', key: eventKey, consumerTag, consumeFn, options });
 
     return consumerTag;
   }
@@ -232,43 +145,32 @@ class CoinifyRabbit {
    * Enqueue a task using the global task topic exchange
    *
    * The full task name is used as the routing key
-   *
-   * @param {string} fullTaskName Full name of task to enqueue (including 'service-name.' prefix)
-   * @param {object} context Object of context data to pass along with the task
-   * @param {object} options Object of optional arguments
-   * @param {string} options.delayMillis If set to a positive Number X, delay enqueueing of the task with X milliseconds
-   * @param {string} options.uuid Pre-defined UUID to use for the task
-   * @param {number} options.time Pre-defined timestamp to use for the task
-   * @param {object} options.exchange Object of options to pass to amqplib's assertExchange()
-   * @param {boolean} options.exchange.durable If true, the exchange will survive broker restarts. Defaults to true
-   * @param {boolean} options.exchange.autoDelete If true, the exchange will be destroyed once the number of bindings
-   *                                              for which it is the source drop to zero. Defaults to false.
-   * @return {Promise<{taskName, context, uuid, time}>}
-   */
-  async enqueueTask(fullTaskName, context, options = {}) {
+   *   */
+  async enqueueTask(fullTaskName: string, context: unknown, options?: EnqueueMessageOptions) {
+    const serviceName = options?.service?.name ?? this.config.service.name;
+
     const channel = await this._getChannel();
     const delayMillis = _.get(options, 'delayMillis', 0);
 
     let exchangeName;
-    const publishOptions = {};
+    const publishOptions: amqplib.Options.Publish = {};
     if (delayMillis > 0) {
       const delayedAmqpOptions = _.pick(options, [ 'exchange', 'queue' ]);
       const { delayedExchangeName, delayedQueueName } = await this._assertDelayedTaskExchangeAndQueue(delayMillis, delayedAmqpOptions);
       exchangeName = delayedExchangeName;
       publishOptions.BCC = delayedQueueName;
     } else {
-      exchangeName = _.get(this._config, 'exchanges.tasksTopic');
+      exchangeName = _.get(this.config, 'exchanges.tasksTopic');
       await channel.assertExchange(exchangeName, 'topic', _.get(options, 'exchange', {}));
     }
 
-    this._logger.trace({ fullTaskName, context, exchangeName, options, publishOptions }, 'enqueueTask()');
+    this.logger.trace({ fullTaskName, context, exchangeName, options, publishOptions }, 'enqueueTask()');
 
-    const serviceName = _.get(_.defaultsDeep({}, options, this._config), 'service.name');
-    const task = {
+    const task: Task = {
       taskName: fullTaskName,
       context,
-      uuid: options.uuid || uuid.v4(),
-      time: options.time ? new Date(options.time).getTime() : Date.now(),
+      uuid: options?.uuid ?? uuidv4(),
+      time: options?.time ? new Date(options.time).getTime() : Date.now(),
       attempts: 0,
       origin: serviceName,
       delayMillis: delayMillis > 0 && delayMillis
@@ -276,105 +178,56 @@ class CoinifyRabbit {
 
     const message = Buffer.from(JSON.stringify(task));
 
-    const publishResult = await channel.publish(exchangeName, fullTaskName, message, publishOptions);
+    const publishResult = channel.publish(exchangeName, fullTaskName, message, publishOptions);
     if (!publishResult) {
       throw new Error('channel.publish() resolved to ' + JSON.stringify(publishResult));
     }
 
-    this._logger.info({ task, exchangeName, options }, 'Enqueued task');
+    this.logger.info({ task, exchangeName, options }, 'Enqueued task');
 
     return task;
   }
 
   /**
-   * Consume a task.
+   * Register a consumer for a task.
    *
    * The configuration variable service.name decides the name of the queue to consume from:
    *   For e.g. a taskName of 'my-task' and a service.name of 'my-service', the task queue will be 'my-service.my-task'
    *
-   * @param {string} taskName Name of task to consume. Prefixed with service name and dot (.)
-   * @param {function<Promise>} consumeFn Function that will be called for each task to consume.
-   *                                      The following arguments are passed to the function:
-   *                                      - {object} context Context for the task
-   *                                      - {object} task Other task data, such as taskName, uuid, time
-   * @param {object} options Object of optional arguments
-   * @param {string} options.consumerTag Explicit consumer tag to use
-   * @param {function<Promise>} options.onCancel Function which will be called if the consumer was cancelled.
-   *                                             It has not yet been possible to test this functionality.
-   * @param {function<Promise>} options.onError Function which will be called if consumeFn rejected.
-   *                                            Argument to function is a single object with the following properties:
-   *                                              - {Error} err The error that consumeFn rejected with
-   *                                              - {object} context The task context
-   *                                              - {object} task Extra task data, such as taskName, uuid, time
-   *                                              - {boolean} willRetry Whether or not retrying consumption will be attempted later
-   *                                              - {number} delaySeconds Number of seconds to delay before retrying
-   *                                            If this function is not given, the error will be logged with 'error' level.
-   *                                            If this function is given and rejects, the rejection will be logged with 'error' level.
-   *                                            If this function resolves, nothing will be logged.
-   * @param {object} options.queue Object of options to pass to amqplib's assertQueue() for both task and retry queues
-   * @param {boolean} options.queue.durable If true, the queue will survive broker restarts,
-   *                                        modulo the effects of exclusive and autoDelete;
-   *                                        This defaults to true if not supplied, unlike the others
-   * @param {boolean} options.queue.autoDelete If true, the queue will be destroyed once the number of consumers drops
-   *                                           to zero. Defaults to false.
-   * @param {object} options.exchange Object of options to pass to amqplib's assertExchange() for both task and retry exchanges
-   * @param {boolean} options.exchange.durable If true, the exchange will survive broker restarts. Defaults to true
-   * @param {boolean} options.exchange.autoDelete If true, the exchange will be destroyed once the number of bindings
-   *                                              for which it is the source drop to zero. Defaults to false.
-   * @param {boolean} options.uniqueQueue If true, each task consumer in this service will get its own event queue,
-   *                                        causing each instance of the service to consume the event. Defaults to false.
-   *                                        Setting this to true forces queue.autoDelete to true as well.
-   * @param {number} options.consumer.prefetch Sets the limit for number of unacknowledged messages for this consumer.
-   *                                           Defaults to the consumer.prefetch configuration value.
-   *                                           If this option is specified, all calls to this function (and registerEventConsumer)
-   *                                           must be done serially to avoid race conditions, causing incorrect prefetch values to be set
-   * @param {object|false} options.retry Specify how (if at all) performing the task should be retried on failure (if `consumeFn` rejects).
-   * @param {object} options.retry.backoff Backoff configuration for retrying tasks
-   * @param {string} options.retry.backoff.type Type of backoff: 'exponential' or 'fixed'. Defaults to 'fixed'
-   *                                            For exponential backoff, the delay until next retry is calculated as (delay * (base ^ n)),
-   *                                            where n is the current attempt (0-indexed). First retry is thus always after `delay` seconds
-   *                                            For fixed backoff, the delay until next retry is always options.backoff.delay
-   * @param {number} options.retry.backoff.delay Delay in seconds. Defaults to 16 seconds
-   * @param {number} options.retry.backoff.base (Only for exponential backoff) The base number for the exponentiation. Defaults to 2
-   * @param {number} options.retry.maxAttempts The maximum number of retry attempts. Defaults to 12.
-   *                                           If set to 1, the task will at most be run twice:
-   *                                             One for the original attempt, and one retry attempt.
-   *                                           Setting this to 0 is the same as setting options.retry: false
-   * @param {string} options.service.name Custom service.name to use for the queue and full task name, useful for testing.
-   * @return {Promise<string>} Returns the consumer tag which is needed to cancel the consumer
+   * @returns Consumer tag
    */
-  async registerTaskConsumer(taskName, consumeFn, options = {}) {
-    await CoinifyRabbit.validateConsumerRetryOptions(options.retry);
-    const uniqueQueue = _.get(options, 'uniqueQueue', false);
+  async registerTaskConsumer<Context = any>(taskName: string, consumeFn: TaskConsumerFunction<Context>, options?: RegisterTaskConsumerOptions) {
+    CoinifyRabbit.validateConsumerRetryOptions(options?.retry);
 
-    const serviceName = _.get(_.defaultsDeep({}, options, this._config), 'service.name');
+    const serviceName = options?.service?.name ?? this.config.service.name;
+    const exchangeName = this.config.exchanges.tasksTopic;
+    const { uniqueQueue = false } = options ?? {};
+
     const fullTaskName = serviceName + '.' + taskName;
     const taskQueueName = this._getTaskConsumerQueueName(taskName, serviceName, uniqueQueue);
-    const exchangeName = _.get(this._config, 'exchanges.tasksTopic');
 
-    const consumeMessageOptions = _.defaultsDeep({ queueName: taskQueueName }, options);
-
-    this._logger.trace({ taskName, fullTaskName, taskQueueName, exchangeName, options }, 'registerTaskConsumer()');
+    const consumeMessageOptions = { ...options, queueName: taskQueueName };
+    this.logger.trace({ taskName, fullTaskName, taskQueueName, exchangeName, options }, 'registerTaskConsumer()');
 
     const channel = await this._getChannel();
 
-    await channel.assertExchange(exchangeName, 'topic', _.get(options, 'exchange', {}));
+    await channel.assertExchange(exchangeName, 'topic', options?.exchange);
 
-    const queueOptions = _.get(options, 'queue', {});
+    const queueOptions = { ...options?.queue };
     if (uniqueQueue) {
-      _.set(queueOptions, 'autoDelete', true);
+      queueOptions.autoDelete = true;
     }
     const q = await channel.assertQueue(taskQueueName, queueOptions);
     await channel.bindQueue(q.queue, exchangeName, fullTaskName);
 
-    const prefetch = _.get(_.defaultsDeep({}, options, this._config), 'consumer.prefetch');
+    const prefetch = options?.consumer?.prefetch ?? this.config.consumer.prefetch;
     await channel.prefetch(prefetch, false);
     const { consumerTag } = await channel.consume(q.queue,
       async (message) => this._handleConsumeMessage(message, 'task', consumeMessageOptions, consumeFn),
-      { consumerTag: options.consumerTag }
+      { consumerTag: options?.consumerTag }
     );
 
-    this._registeredConsumers.push({ type: 'task', key: taskName, consumerTag, consumeFn, options });
+    this.consumers.push({ type: 'task', key: taskName, consumerTag, consumeFn, options });
 
     return consumerTag;
   }
@@ -400,20 +253,20 @@ class CoinifyRabbit {
    *                                           must be done serially to avoid race conditions, causing incorrect prefetch values to be set
    * @return {Promise<string>} Returns the consumer tag which is needed to cancel the consumer
    */
-  async registerFailedMessageConsumer(consumeFn, options = {}) {
+  async registerFailedMessageConsumer(consumeFn: FailedMessageConsumerFunction, options?: RegisterFailedMessageConsumerOptions) {
     const channel = await this._getChannel();
-    const queueName = _.get(this._config, 'queues.failed');
-    this._logger.trace({ queueName }, 'registerFailedMessageConsumer()');
+    const queueName = this.config.queues.failed;
+    this.logger.trace({ queueName }, 'registerFailedMessageConsumer()');
 
-    const q = await channel.assertQueue(queueName, _.get(options, 'queue', {}));
-    const prefetch = _.get(_.defaultsDeep({}, options, this._config), 'consumer.prefetch');
+    const q = await channel.assertQueue(queueName, options?.queue);
+    const prefetch = options?.consumer?.prefetch ?? this.config.consumer.prefetch;
     await channel.prefetch(prefetch, false);
     const { consumerTag } = await channel.consume(q.queue,
-      async (message) => this._handleFailedMessage(message, options, consumeFn),
-      { consumerTag: options.consumerTag }
+      async (message) => message && this._handleFailedMessage(message, { ...options, queueName }, consumeFn),
+      { consumerTag: options?.consumerTag }
     );
 
-    this._registeredConsumers.push({ type: 'message', key: 'failed', consumerTag, consumeFn, options });
+    this.consumers.push({ type: 'message', key: 'failed', consumerTag, consumeFn, options });
 
     return consumerTag;
   }
@@ -422,13 +275,15 @@ class CoinifyRabbit {
     await this._getConnection();
   }
 
+  private _channel?: amqplib.Channel;
+  private _getChannelPromise?: Promise<void>;
   /**
    * Get a channel in RabbitMQ
    *
    * @return {Promise<amqplib.Channel>}
    * @private
    */
-  async _getChannel() {
+  async _getChannel(): Promise<amqplib.Channel> {
     if (!this._channel) {
       /*
        * In order to not create multiple channels when invoked multiple times, while still waiting for the
@@ -439,13 +294,13 @@ class CoinifyRabbit {
         this._getChannelPromise = (async () => {
           try {
             const connection = await this._getConnection();
-            this._logger.info({}, 'Opening channel');
+            this.logger.info({}, 'Opening channel');
 
             this._channel = await connection.createChannel();
 
             this._channel.on('error', err => {
               // Basic error handling: Log error and discard current channel, so a new one will be created next time
-              this._logger.warn({ err }, 'RabbitMQ channel error');
+              this.logger.warn({ err }, 'RabbitMQ channel error');
               delete this._channel;
             });
             this._channel.on('close', err => {
@@ -453,11 +308,9 @@ class CoinifyRabbit {
               this._onChannelClosed(err);
             });
 
-            this._channel.id = Math.random();
-
             await this._onChannelOpened(this._channel);
           } catch (err) {
-            this._logger.error({ err }, 'Error creating RabbitMQ channel');
+            this.logger.error({ err }, 'Error creating RabbitMQ channel');
           } finally {
             delete this._getChannelPromise;
           }
@@ -474,14 +327,17 @@ class CoinifyRabbit {
     return this._channel;
   }
 
+  private _conn?: amqplib.Connection;
+  private _getConnectionPromise?: Promise<void>;
+
   /**
    * Get a singleton connection to RabbitMQ
    * @return {Promise<amqplib.Connection>}
    * @private
    */
-  async _getConnection() {
+  async _getConnection(): Promise<amqplib.Connection> {
     if (!this._conn) {
-      if (this._isShuttingDown) {
+      if (this.isShuttingDown) {
         throw new Error('RabbitMQ module is shutting down');
       }
 
@@ -493,23 +349,23 @@ class CoinifyRabbit {
         // Create and start executing promise immediately
         this._getConnectionPromise = (async () => {
           try {
-            const connectionConfig = _.get(this._config, 'connection');
-            this._logger.info({ connectionConfig: _.omit(connectionConfig, [ 'password' ]) }, 'Opening connection to RabbitMQ');
+            const connectionConfig = _.get(this.config, 'connection');
+            this.logger.info({ connectionConfig: _.omit(connectionConfig, [ 'password' ]) }, 'Opening connection to RabbitMQ');
 
-            this._conn = await amqplib.connect(CoinifyRabbit._generateConnectionUrl(connectionConfig), { clientProperties: { connection_name: _.get(this._config, 'service.name') } });
+            this._conn = await amqplib.connect(CoinifyRabbit._generateConnectionUrl(connectionConfig), { clientProperties: { connection_name: _.get(this.config, 'service.name') } });
             this._conn.on('error', err => {
               // Basic error handling: Log error and discard current connection, so a new one will be created next time
-              this._logger.warn({ err }, 'RabbitMQ connection error');
+              this.logger.warn({ err }, 'RabbitMQ connection error');
               delete this._conn;
             });
             this._conn.on('close', err => {
               delete this._conn;
-              this._logger.info({ err }, 'Connection closed');
+              this.logger.info({ err }, 'Connection closed');
             });
 
-            this._logger.info({}, 'Connection opened');
+            this.logger.info({}, 'Connection opened');
           } catch (err) {
-            this._logger.error({ err }, 'Error connecting to RabbitMQ');
+            this.logger.error({ err }, 'Error connecting to RabbitMQ');
           } finally {
             delete this._getConnectionPromise;
           }
@@ -536,7 +392,7 @@ class CoinifyRabbit {
    * @return {string} Connection URL
    * @private
    */
-  static _generateConnectionUrl(connectionConfig) {
+  static _generateConnectionUrl(connectionConfig: CoinifyRabbitConnectionConfiguration) {
     // Check for valid protocol
     if (!_.includes([ 'amqp', 'amqps' ], connectionConfig.protocol)) {
       throw new Error(`Invalid protocol '${connectionConfig.protocol}'. Must be 'amqp' or 'amqps'`);
@@ -569,10 +425,10 @@ class CoinifyRabbit {
    * @return {Promise.<void>}
    * @private
    */
-  async _onChannelOpened(channel) {
-    this._logger.info({}, 'Channel opened');
+  private async _onChannelOpened(channel: amqplib.Channel) {
+    this.logger.info({}, 'Channel opened');
 
-    const prefetch = _.get(this._config, 'channel.prefetch');
+    const prefetch = _.get(this.config, 'channel.prefetch');
     await channel.prefetch(prefetch, true);
 
     await this._recreateRegisteredConsumers();
@@ -584,25 +440,26 @@ class CoinifyRabbit {
    * @return {Promise.<void>}
    * @private
    */
-  async _recreateRegisteredConsumers() {
-    const consumers = _.cloneDeep(this._registeredConsumers);
-    this._registeredConsumers = [];
+  private async _recreateRegisteredConsumers() {
+    const consumers: Consumer[] = _.cloneDeep(this.consumers);
+    this.consumers = [];
 
     /*
      * Re-create all registered consumers
      */
-    for (const { type, key, consumerTag, consumeFn, options } of consumers) {
-      // Require same consumerTag as originally used
-      options.consumerTag = consumerTag;
-      switch (type) {
+    for (const consumer of consumers) {
+      switch (consumer.type) {
         case 'event':
-          await this.registerEventConsumer(key, consumeFn, options);
+          await this.registerEventConsumer(consumer.key, consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag } );
           break;
         case 'task':
-          await this.registerTaskConsumer(key, consumeFn, options);
+          await this.registerTaskConsumer(consumer.key, consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag } );
+          break;
+        case 'message':
+          await this.registerFailedMessageConsumer(consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag } );
           break;
         default:
-          throw new Error(`Internal error: Unknown consumer type '${type}'`);
+          throw new Error(`Internal error: Unknown consumer type '${(consumer as any).type}'`);
       }
     }
   }
@@ -617,16 +474,16 @@ class CoinifyRabbit {
    * @return {Promise.<void>}
    * @private
    */
-  async _onChannelClosed(err) {
-    if (this._isShuttingDown) {
-      this._logger.info({ err }, 'Channel closed');
+  private async _onChannelClosed(err?: Error) {
+    if (this.isShuttingDown) {
+      this.logger.info({ err }, 'Channel closed');
       // Channel close requested. We won't try to reconnect
       return;
     }
 
-    this._logger.warn({ err }, 'Channel closed unexpectedsly.');
+    this.logger.warn({ err }, 'Channel closed unexpectedsly.');
 
-    if (!this._registeredConsumers.length) {
+    if (!this.consumers.length) {
       // No registered consumers, no need to reconnect automatically.
       return;
     }
@@ -640,7 +497,7 @@ class CoinifyRabbit {
    * @return {Promise.<void>}
    * @private
    */
-  async _connectWithBackoff() {
+  private async _connectWithBackoff() {
     // Attempts to reconnect after 1, 1, 2, 3, 5, 10, 20, 30, 50, 60, 60, 60... seconds
     const fibonacciBackoff = backoff.fibonacci({
       initialDelay: 1000,
@@ -648,10 +505,10 @@ class CoinifyRabbit {
     });
 
     fibonacciBackoff.on('ready', (number, delay) => {
-      if (this._isShuttingDown) {
+      if (this.isShuttingDown) {
         return;
       }
-      this._logger.info({}, `Connecting... (attempt ${number}, delay ${delay}ms)`);
+      this.logger.info({}, `Connecting... (attempt ${number}, delay ${delay}ms)`);
 
       // If we're already attempting to connect, no reason to add another listener to the promise
       if (this._getChannelPromise) {
@@ -660,10 +517,10 @@ class CoinifyRabbit {
 
       // Try to connect to a channel
       this._getChannel()
-      // If error, log and retry again later
+        // If error, log and retry again later
         .catch(err => {
           fibonacciBackoff.backoff();
-          this._logger.warn({ err }, 'Error reconnecting to channel');
+          this.logger.warn({ err }, 'Error reconnecting to channel');
         });
     });
 
@@ -677,20 +534,20 @@ class CoinifyRabbit {
    * than a positive integer will result in no timeout.
    * @return {Promise.<void>}
    */
-  async shutdown(timeout = null) {
-    if (this._isShuttingDown) {
+  async shutdown(timeout?: number) {
+    if (this.isShuttingDown) {
       return;
     }
-    this._isShuttingDown = true;
+    this.isShuttingDown = true;
 
     /*
      * Log information about shutdown process
      */
-    const activeTaskConsumptions = _.filter(this._activeMessageConsumptions, c => !!c.taskName);
-    const activeEventConsumptions = _.filter(this._activeMessageConsumptions, c => !!c.eventName);
+    const activeTaskConsumptions = this.activeMessageConsumptions.filter(c => 'taskName' in c);
+    const activeEventConsumptions = this.activeMessageConsumptions.filter(c => 'eventName' in c);
 
-    this._logger.info({
-      registeredConsumers: JSON.stringify(this._registeredConsumers.map(c => _.pick(c, [ 'type', 'key', 'consumerTag' ]))),
+    this.logger.info({
+      registeredConsumers: JSON.stringify(this.consumers.map(c => _.pick(c, [ 'type', 'key', 'consumerTag' ]))),
       activeConsumption: {
         tasks: JSON.stringify(activeTaskConsumptions.map(c => _.pick(c, [ 'uuid', 'taskName' ]))),
         events: JSON.stringify(activeEventConsumptions.map(c => _.pick(c, [ 'uuid', 'eventName' ])))
@@ -698,26 +555,26 @@ class CoinifyRabbit {
       timeout
     }, 'Shutting down RabbitMQ');
 
-    if (_.size(this._registeredConsumers)) {
+    if (_.size(this.consumers)) {
       await this._cancelAllConsumers();
       await this._waitForConsumersToFinish(timeout);
     }
 
     // If there are still active consumers, NACK 'em all
-    if (_.size(this._activeMessageConsumptions)) {
+    if (_.size(this.activeMessageConsumptions)) {
       const channel = await this._getChannel();
       await channel.nackAll();
     }
 
     // Close channel if open
     if (this._channel) {
-      this._logger.debug({}, 'Closing channel');
+      this.logger.info({}, 'Closing channel');
       await this._channel.close();
       delete this._channel;
     }
     // Close connection if open
     if (this._conn) {
-      this._logger.debug({}, 'Closing connection');
+      this.logger.info({}, 'Closing connection');
       await this._conn.close();
       delete this._conn;
     }
@@ -729,25 +586,25 @@ class CoinifyRabbit {
    * @return {Promise.<void>}
    * @private
    */
-  async _cancelAllConsumers() {
+  private async _cancelAllConsumers() {
     const channel = await this._getChannel();
 
-    this._logger.info({}, 'Cancelling all consumers');
+    this.logger.info({}, 'Cancelling all consumers');
 
-    await Promise.all(this._registeredConsumers.map(c => channel.cancel(c.consumerTag)));
+    await Promise.all(this.consumers.map(c => channel.cancel(c.consumerTag)));
 
-    this._registeredConsumers = [];
+    this.consumers = [];
   }
 
   /**
    * Waits for any active message consumers to finish, optionally bounded by a timeout
    *
-   * @param {int|null} timeout Timeout in milliseconds. If anything else than a positive integer, wait forever.
+   * @param {number|undefined} timeout Timeout in milliseconds. If anything else than a positive integer, wait forever.
    * @return {Promise.<void>}
    * @private
    */
-  async _waitForConsumersToFinish(timeout = null) {
-    if (_.size(this._activeMessageConsumptions) === 0) {
+  private async _waitForConsumersToFinish(timeout?: number) {
+    if (_.size(this.activeMessageConsumptions) === 0) {
       return;
     }
 
@@ -755,12 +612,12 @@ class CoinifyRabbit {
       const resolveOnce = _.once(resolve);
 
       this.on('messageConsumed', () => {
-        if (_.size(this._activeMessageConsumptions) === 0) {
-          resolveOnce();
+        if (_.size(this.activeMessageConsumptions) === 0) {
+          resolveOnce(undefined);
         }
       });
 
-      if (_.isInteger(timeout) && timeout > 0) {
+      if (timeout && _.isInteger(timeout) && timeout > 0) {
         setTimeout(resolveOnce, timeout);
       }
     });
@@ -785,7 +642,7 @@ class CoinifyRabbit {
    * @return {string} Name of queue to consume events
    * @private
    */
-  _getConsumeEventQueueName(eventKey, serviceName, uniqueQueue=false) {
+  _getConsumeEventQueueName(eventKey: string, serviceName: string, uniqueQueue = false) {
     let queueName = 'events.' + serviceName;
     if (uniqueQueue) {
       queueName += '.instance-' + this._getInstanceIdentifier();
@@ -803,7 +660,7 @@ class CoinifyRabbit {
    * @return {string} Name of queue to consume tasks
    * @private
    */
-  _getTaskConsumerQueueName(taskName, serviceName, uniqueQueue=false) {
+  _getTaskConsumerQueueName(taskName: string, serviceName: string, uniqueQueue = false) {
     let queueName = 'tasks.' + serviceName;
     if (uniqueQueue) {
       queueName += '.instance-' + this._getInstanceIdentifier();
@@ -827,7 +684,7 @@ class CoinifyRabbit {
    * @return {Promise.<*>}
    * @private
    */
-  async _handleConsumeMessage(message, messageType, options, consumeFn) {
+  private async _handleConsumeMessage<Context = any>(message: amqplib.ConsumeMessage | null, messageType: 'event' | 'task', options: ConsumeMessageOptions, consumeFn: ConsumerFunction<Context>) {
     // message === null if consumer is cancelled: http://www.rabbitmq.com/consumer-cancel.html
     if (message === null) {
       if (!options.onCancel) {
@@ -843,8 +700,8 @@ class CoinifyRabbit {
     const context = msgObj.context;
     const name = messageType === 'event' ? msgObj.eventName : msgObj.taskName;
 
-    this._logger.info({ [messageType]: msgObj }, `${messageType} ${name} ready to be consumed`);
-    this._activeMessageConsumptions.push(msgObj);
+    this.logger.info({ [messageType]: msgObj }, `${messageType} ${name} ready to be consumed`);
+    this.activeMessageConsumptions.push(msgObj);
 
     let consumeError = null;
     try {
@@ -853,11 +710,11 @@ class CoinifyRabbit {
       const consumeTimeMillis = Date.now() - startTime;
 
       const consumeResultTruncated = _.truncate(JSON.stringify(consumeResult), { length: 4096 });
-      this._logger.info({ [messageType]: msgObj, consumeResult: consumeResultTruncated, consumeTimeMillis }, `${messageType} ${name} consumed`);
+      this.logger.info({ [messageType]: msgObj, consumeResult: consumeResultTruncated, consumeTimeMillis }, `${messageType} ${name} consumed`);
     } catch (err) {
       consumeError = err;
     }
-    _.pull(this._activeMessageConsumptions, msgObj);
+    _.pull(this.activeMessageConsumptions, msgObj);
     this.emit('messageConsumed', msgObj);
 
     /*
@@ -865,9 +722,9 @@ class CoinifyRabbit {
      * If it failed, we'll republish it to the dead letter exchange, possibly with retry
      */
     try {
-      await channel.ack(message);
+      channel.ack(message);
     } catch (err) {
-      this._logger.error({ [messageType]: msgObj, err }, `Error ACK\'ing ${messageType}!`);
+      this.logger.error({ [messageType]: msgObj, err }, `Error ACK\'ing ${messageType}!`);
     }
 
     // If no error happened during consumption, we are done here.
@@ -907,7 +764,7 @@ class CoinifyRabbit {
    * @return {Promise.<void>}
    * @private
    */
-  async _handleConsumeRejection(message, messageType, messageObject, consumeError, options) {
+  private async _handleConsumeRejection(message: amqplib.ConsumeMessage, messageType: 'event' | 'task', messageObject: Event | Task, consumeError: any, options: ConsumeMessageOptions) {
     const allowedTypes = [ 'event', 'task' ];
 
     if (!allowedTypes.includes(messageType)) {
@@ -923,43 +780,44 @@ class CoinifyRabbit {
       shouldRetry = false;
     }
 
-    const onError = _.has(options, 'onError') ?
-      options.onError :
-      async () => {
+    const messageName = 'eventName' in messageObject ? messageObject.eventName : messageObject.taskName;
+
+    const onError = options?.onError ??
+      (async () => {
         // No onError function. We'll just log it with 'error' level
-        const name = messageType === 'event' ? messageObject.eventName : messageObject.taskName;
-        const errMessage = `Error consuming ${messageType} ${name}: ${consumeError.message}. `
+        const errMessage = `Error consuming ${messageType} ${messageName}: ${consumeError.message}. `
           + (shouldRetry ? `Will retry in ${delaySeconds} seconds` : 'No retry');
         if (shouldRetry) {
-          this._logger.info({ err: consumeError, [messageType]: messageObject }, errMessage);
+          this.logger.info({ err: consumeError, [messageType]: messageObject }, errMessage);
         } else {
-          this._logger.error({ err: consumeError, [messageType]: messageObject }, errMessage);
+          this.logger.error({ err: consumeError, [messageType]: messageObject }, errMessage);
         }
-      };
+      });
 
     // Using ES6 object literals below
     // that allow us to create a dynamic key
     // (in this case, with the value of the `type` param)
     // See: http://www.benmvp.com/learning-es6-enhanced-object-literals/
     try {
-      const onErrorArgs = {
+      const onErrorArgs: OnEventErrorFunctionParams & OnTaskErrorFunctionParams = {
         err: consumeError,
         context: messageObject.context,
         willRetry: shouldRetry,
         delaySeconds,
-        [messageType]: messageObject
-      };
+        event: 'eventName' in messageObject ? messageObject : undefined,
+        task: 'taskName' in messageObject ? messageObject : undefined
+      } as any;
 
       await onError(onErrorArgs);
     } catch (err) {
-      err.cause = consumeError;
+      (err as any).cause = consumeError;
       // Both consume function and error handling function rejected. Log as error
-      this._logger.error({ err, [messageType]: messageObject }, `${messageType} error handling function rejected!`);
+      this.logger.error({ err, [messageType]: messageObject }, `${messageType} error handling function rejected!`);
     }
 
     const retryAmqpOptions = _.pick(options, [ 'exchange', 'queue' ]);
 
-    const publishOptions = {};
+    const publishOptions: amqplib.Options.Publish = {};
     let republishExchangeName;
     if (shouldRetry) {
       const retryExchangeAndQueue = await this._assertRetryExchangeAndQueue(delaySeconds, retryAmqpOptions);
@@ -994,10 +852,9 @@ class CoinifyRabbit {
     // Log action
     const logContext = { [messageType]: messageObject, routingKey, shouldRetry, delaySeconds, publishOptions };
     if (shouldRetry) {
-      this._logger.trace(logContext, `Scheduled ${messageType} for retry`);
+      this.logger.trace(logContext, `Scheduled ${messageType} for retry`);
     } else {
-      const messageName = messageType === 'task' ? messageObject.taskName : messageObject.eventName;
-      this._logger.info(logContext, `${messageType} ${messageName} sent to dead-letter exchange without retry`);
+      this.logger.info(logContext, `${messageType} ${messageName} sent to dead-letter exchange without retry`);
     }
   }
 
@@ -1015,7 +872,7 @@ class CoinifyRabbit {
    * @return {Promise.<*>}
    * @private
    */
-  async _handleFailedMessage(message, options, consumeFn) {
+  private async _handleFailedMessage(message: amqplib.ConsumeMessage, options: ConsumeMessageOptions, consumeFn: ConsumerFunction) {
     // message === null if consumer is cancelled: http://www.rabbitmq.com/consumer-cancel.html
     if (message === null) {
       if (!options.onCancel) {
@@ -1028,8 +885,8 @@ class CoinifyRabbit {
 
     const msgObj = JSON.parse(message.content.toString());
 
-    this._logger.debug({ message: msgObj }, 'message from failed queue ready to be consumed');
-    this._activeMessageConsumptions.push(msgObj);
+    this.logger.debug({ message: msgObj }, 'message from failed queue ready to be consumed');
+    this.activeMessageConsumptions.push(msgObj);
 
     try {
       const startTime = Date.now();
@@ -1038,12 +895,12 @@ class CoinifyRabbit {
 
       const consumeResultTruncated = _.truncate(JSON.stringify(consumeResult), { length: 4096 });
       await channel.ack(message);
-      this._logger.info({ message: msgObj, consumeResult: consumeResultTruncated, consumeTimeMillis }, 'message consumed');
+      this.logger.info({ message: msgObj, consumeResult: consumeResultTruncated, consumeTimeMillis }, 'message consumed');
     } catch (err) {
-      this._logger.warn({ err, message: msgObj }, 'Error consuming message from failed queue');
+      this.logger.warn({ err, message: msgObj }, 'Error consuming message from failed queue');
       await channel.nack(message);
     }
-    _.pull(this._activeMessageConsumptions, msgObj);
+    _.pull(this.activeMessageConsumptions, msgObj);
     this.emit('messageConsumed', msgObj);
   }
 
@@ -1055,20 +912,20 @@ class CoinifyRabbit {
    * @param  {object} options Object of options to pass to amqplib's channel.publish()
    * @return {object} Returns the messageObject
    */
-  async enqueueMessage(queueName, messageObject, options = {}) {
+  async enqueueMessage(queueName: string, messageObject: Event | Task, options?: { exchange?: amqplib.Options.Publish }) {
     const channel = await this._getChannel();
 
     const message = Buffer.from(JSON.stringify(messageObject));
 
     // Empty string is the default direct exchange
     const exchangeName = '';
-    const publishResult = await channel.publish(exchangeName, queueName, message, options);
+    const publishResult = await channel.publish(exchangeName, queueName, message, options?.exchange);
 
     if (!publishResult) {
       throw new Error('channel.publish() resolved to ' + JSON.stringify(publishResult));
     }
 
-    this._logger.info({ messageObject, exchangeName, options }, 'Enqueued message');
+    this.logger.info({ messageObject, exchangeName, options }, 'Enqueued message');
 
     return messageObject;
   }
@@ -1085,12 +942,12 @@ class CoinifyRabbit {
    *                                                        and the name of the retry queue with the specific delay.
    * @private
    */
-  async _assertRetryExchangeAndQueue(delaySeconds, options = {}) {
+  private async _assertRetryExchangeAndQueue(delaySeconds: number, options?: { exchange?: amqplib.Options.AssertExchange; queue?: amqplib.Options.AssertQueue }) {
     const channel = await this._getChannel();
     const delayMs = Math.round(delaySeconds * 1000);
 
-    const retryExchangeName = _.get(this._config, 'exchanges.retry');
-    const retryQueueName = _.get(this._config, 'queues.retryPrefix') + '.' + delayMs + 'ms';
+    const retryExchangeName = _.get(this.config, 'exchanges.retry');
+    const retryQueueName = _.get(this.config, 'queues.retryPrefix') + '.' + delayMs + 'ms';
     const exchangeOptions = _.defaultsDeep({}, _.get(options, 'exchange', {}), { autoDelete: true });
 
     await channel.assertExchange(retryExchangeName, 'direct', exchangeOptions);
@@ -1120,22 +977,23 @@ class CoinifyRabbit {
    *                                                        and the name of the retry queue with the specific delay.
    * @private
    */
-  async _assertDelayedTaskExchangeAndQueue(delayMillis, options = {}) {
+  private async _assertDelayedTaskExchangeAndQueue(delayMillis: number, options?: { exchange?: amqplib.Options.AssertExchange; queue?: amqplib.Options.AssertQueue }) {
     const channel = await this._getChannel();
 
-    const delayedExchangeName = _.get(this._config, 'exchanges.delayed');
-    const delayedQueueName = _.get(this._config, 'queues.delayedTaskPrefix') + '.' + delayMillis + 'ms';
-    const exchangeOptions = _.defaultsDeep({}, _.get(options, 'exchange', {}), { autoDelete: true });
-    const tasksExchangeName = _.get(this._config, 'exchanges.tasksTopic');
+    const delayedExchangeName = this.config.exchanges.delayed;
+    const delayedQueueName = this.config.queues.delayedTaskPrefix + '.' + delayMillis + 'ms';
+    const exchangeOptions: amqplib.Options.AssertExchange = { ...options?.exchange, autoDelete: true };
+    const tasksExchangeName = this.config.exchanges.tasksTopic;
 
     await channel.assertExchange(delayedExchangeName, 'direct', exchangeOptions);
 
-    const queueOptions = _.defaultsDeep({}, _.get(options, 'queue', {}), {
+    const queueOptions: amqplib.Options.AssertQueue = {
+      ...options?.queue,
       expires: delayMillis + 10000,
       autoDelete: true,
       deadLetterExchange: tasksExchangeName,
       messageTtl: delayMillis
-    });
+    };
     const q = await channel.assertQueue(delayedQueueName, queueOptions);
     await channel.bindQueue(q.queue, delayedExchangeName, q.queue);
 
@@ -1151,18 +1009,17 @@ class CoinifyRabbit {
    * @return {Promise<string>} Resolves to name of dead letter exchange
    * @private
    */
-  async _assertDeadLetterExchangeAndQueue(options) {
+  private async _assertDeadLetterExchangeAndQueue(options?: { exchange?: amqplib.Options.AssertExchange; queue?: amqplib.Options.AssertQueue }) {
     const channel = await this._getChannel();
 
-    const deadLetterExchangeName = _.get(this._config, 'exchanges.failed');
-    const deadLetterQueueName = _.get(this._config, 'queues.failed');
-    const exchangeOptions = _.get(options, 'exchange', {});
+    const deadLetterExchangeName = this.config.exchanges.failed;
+    const deadLetterQueueName = this.config.queues.failed;
 
-    await channel.assertExchange(deadLetterExchangeName, 'fanout', exchangeOptions);
+    await channel.assertExchange(deadLetterExchangeName, 'fanout', options?.exchange);
 
-    const queueOptions = _.get(options, 'queue', {});
-    const q = await channel.assertQueue(deadLetterQueueName, queueOptions);
-    await channel.bindQueue(q.queue, deadLetterExchangeName);
+    const q = await channel.assertQueue(deadLetterQueueName, options?.queue);
+    // TODO Does '' below work?
+    await channel.bindQueue(q.queue, deadLetterExchangeName, '');
 
     return deadLetterExchangeName;
   }
@@ -1186,7 +1043,7 @@ class CoinifyRabbit {
    *                                     Setting this to -1 means unlimited retries
    * @returns {{shouldRetry, delaySeconds}}
    */
-  static _decideConsumerRetry(currentAttempt, options) {
+  static _decideConsumerRetry(currentAttempt: number, options?: RetryConfiguration): { shouldRetry: boolean; delaySeconds: number } {
     let delaySeconds = 0;
 
     // Check if we should retry at all
@@ -1216,7 +1073,7 @@ class CoinifyRabbit {
     switch (backoffType) {
       case 'exponential': {
         const eBase = _.get(options, 'backoff.base', 2);
-        delaySeconds = delaySeconds * (eBase ** currentAttempt);
+        delaySeconds = delaySeconds * eBase ** currentAttempt;
         break;
       }
       case 'fixed': {
@@ -1247,8 +1104,8 @@ class CoinifyRabbit {
    *                                     Setting this to 0 is the same as setting options.retry: false
    * @return {Promise<void>} Resolves on valid options, rejects with error message on invalid options
    */
-  static async validateConsumerRetryOptions(options) {
-    await CoinifyRabbit._decideConsumerRetry(0, options);
+  static validateConsumerRetryOptions(options?: RetryConfiguration) {
+    CoinifyRabbit._decideConsumerRetry(0, options);
   }
 }
 

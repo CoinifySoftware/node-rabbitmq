@@ -1,25 +1,22 @@
-'use strict';
-
-const CoinifyRabbit = require('../../../lib/CoinifyRabbit'),
-  sinon = require('sinon'),
-  _ = require('lodash');
+import { expect } from 'chai';
+import sinon from 'sinon';
+import CoinifyRabbit from '../../../src/CoinifyRabbit';
 
 describe('CoinifyRabbit', () => {
 
   describe('#_handleFailedMessage', () => {
 
-    let _getChannelStub,
-      consumeFnStub,
-      channelAckStub,
-      channelNackStub,
-      _handleConsumeRejectionStub,
+    let _getChannelStub: sinon.SinonStub,
+      consumeFnStub: sinon.SinonStub,
+      channelAckStub: sinon.SinonStub,
+      channelNackStub: sinon.SinonStub,
 
-      rabbit;
+      rabbit: CoinifyRabbit;
 
     const fullTaskName = 'service.the-task';
-    let task,
-      message,
-      options;
+    let task: any,
+      message: any,
+      options: any;
 
     beforeEach(() => {
       rabbit = new CoinifyRabbit();
@@ -52,7 +49,7 @@ describe('CoinifyRabbit', () => {
     it('should call consumeFn and ack if consumeFn resolves', async () => {
       consumeFnStub.resolves();
       channelAckStub.resolves();
-      await rabbit._handleFailedMessage(message, options, consumeFnStub);
+      await (rabbit as any)._handleFailedMessage(message, options, consumeFnStub);
       expect(consumeFnStub.calledOnce).to.equal(true);
       expect(consumeFnStub.firstCall.args).to.deep.equal([ message.fields.routingKey, task ]);
       expect(channelAckStub.calledOnce).to.equal(true);
@@ -65,7 +62,7 @@ describe('CoinifyRabbit', () => {
       consumeFnStub.rejects(consumeError);
       channelAckStub.resolves();
 
-      await rabbit._handleFailedMessage(message, options, consumeFnStub);
+      await (rabbit as any)._handleFailedMessage(message, options, consumeFnStub);
       expect(consumeFnStub.calledOnce).to.equal(true);
       expect(consumeFnStub.firstCall.args).to.deep.equal([ message.fields.routingKey, task ]);
       expect(channelAckStub.notCalled).to.equal(true);
@@ -78,7 +75,7 @@ describe('CoinifyRabbit', () => {
       options.onCancel = sinon.stub();
       options.onCancel.resolves(onCancelResolution);
 
-      expect(await rabbit._handleFailedMessage(null, options, consumeFnStub)).to.equal(onCancelResolution);
+      expect(await (rabbit as any)._handleFailedMessage(null, options, consumeFnStub)).to.equal(onCancelResolution);
       expect(options.onCancel.calledOnce).to.equal(true);
       expect(consumeFnStub.notCalled).to.equal(true);
       expect(channelAckStub.notCalled).to.equal(true);

@@ -1,19 +1,16 @@
-'use strict';
-
-const sinon = require('sinon'),
-  EventEmitter = require('events');
-
-const CoinifyRabbit = require('../../../lib/CoinifyRabbit');
-
-const amqplib = require('amqplib');
+import amqplib from 'amqplib';
+import { expect } from 'chai';
+import EventEmitter from 'events';
+import sinon from 'sinon';
+import CoinifyRabbit from '../../../src/CoinifyRabbit';
 
 describe('CoinifyRabbit', () => {
 
   describe('#_getConnection', () => {
 
-    let _generateConnectionUrlStub,
-      amqplibConnectStub,
-      rabbit;
+    let _generateConnectionUrlStub: sinon.SinonStub,
+      amqplibConnectStub: sinon.SinonStub,
+      rabbit: CoinifyRabbit;
 
     const connectionUrl = 'the-connection-url';
 

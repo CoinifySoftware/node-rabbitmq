@@ -1,13 +1,13 @@
-'use strict';
-
-const CoinifyRabbit = require('../../../lib/CoinifyRabbit');
+import { expect } from 'chai';
+import CoinifyRabbit from '../../../src/CoinifyRabbit';
+import { CoinifyRabbitConnectionConfiguration } from '../../../src/CoinifyRabbitConfiguration';
 
 describe('CoinifyRabbit', () => {
 
   describe('#_generateConnectionUrl', () => {
 
     it('should generate a minimal URL', () => {
-      const connectionConfig = {
+      const connectionConfig: CoinifyRabbitConnectionConfiguration = {
         protocol: 'amqp',
         host: 'myhost'
       };
@@ -18,7 +18,7 @@ describe('CoinifyRabbit', () => {
     });
 
     it('should generate a full-blown URL', () => {
-      const connectionConfig = {
+      const connectionConfig: CoinifyRabbitConnectionConfiguration = {
         host: 'myhost',
         port: 420,
         vhost: 'myvhost',
@@ -38,7 +38,7 @@ describe('CoinifyRabbit', () => {
         protocol: 'amqp://',
         host: 'blond-crocodile.in.cloudamqp.com',
         username: 'jvfzpbxh'
-      };
+      } as any as CoinifyRabbitConnectionConfiguration;
 
       expect(CoinifyRabbit._generateConnectionUrl.bind(null, connectionConfig)).to.throw('Invalid protocol');
     });

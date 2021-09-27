@@ -1,17 +1,18 @@
-'use strict';
-
-const CoinifyRabbit = require('../../../lib/CoinifyRabbit');
+import { expect } from 'chai';
+import _ from 'lodash';
+import CoinifyRabbit from '../../../src/CoinifyRabbit';
+import { RetryConfiguration } from '../../../src/types';
 
 describe('CoinifyRabbit', () => {
 
   describe('#_decideConsumerRetry', () => {
 
-    const fixedOptions = {
+    const fixedOptions: RetryConfiguration = {
       backoff: {
         type: 'fixed'
       }
     };
-    const exponentialOptions = {
+    const exponentialOptions: RetryConfiguration = {
       backoff: {
         type: 'exponential'
       }
@@ -149,7 +150,7 @@ describe('CoinifyRabbit', () => {
     });
 
     it('should throw an exception for an unknown backoff type', () => {
-      const options = { backoff: { type: 'unknown-type' } };
+      const options = { backoff: { type: 'unknown-type' } } as any as RetryConfiguration;
       expect(CoinifyRabbit._decideConsumerRetry.bind(null, 0, options)).to.throw('backoff.type');
     });
 

@@ -1,16 +1,16 @@
-'use strict';
-
-const CoinifyRabbit = require('../../lib/CoinifyRabbit');
-const { createRabbitMQTestInstance } = require('../bootstrap.test');
+import { expect } from 'chai';
+import CoinifyRabbit from '../../src/CoinifyRabbit';
+import { TaskConsumerFunction } from '../../src/messageTypes/Task';
+import { createRabbitMQTestInstance } from '../bootstrap.test';
 
 describe('Integration tests', () => {
   describe('Failed', () => {
 
-    let rabbit, taskName, fullTaskName, eventName, fullEventName;
+    let rabbit: CoinifyRabbit;
+    let taskName: string, fullTaskName: string, eventName: string, fullEventName: string;
     const serviceName = 'my-test-service',
       enqueueOptions = { exchange: { autoDelete: true } },
       consumerOptions = { exchange: { autoDelete: true }, queue: { autoDelete: true }, retry: { maxAttempts: 0 } },
-      enqueueMessageOptions = { exchange: { autoDelete: true } },
       failedMessageConsumerOptions = { exchange: { autoDelete: true }, queue: { autoDelete: true } },
       eventContext = { myEventContext: false },
       taskContext = { myTaskContext: false },
@@ -18,7 +18,7 @@ describe('Integration tests', () => {
         throw new Error('event processing function rejected');
       };
 
-    beforeEach(async() => {
+    beforeEach(async () => {
       rabbit = createRabbitMQTestInstance({ service: { name: serviceName }, defaultLogLevel: 'fatal' });
       taskName = 'my-task' + Math.random();
       fullTaskName = serviceName + '.' + taskName;
@@ -38,13 +38,13 @@ describe('Integration tests', () => {
         await rabbit.registerTaskConsumer(taskName, failingFn, consumerOptions);
         await rabbit.registerEventConsumer(fullEventName, failingFn, consumerOptions);
         await rabbit.registerFailedMessageConsumer(async (q, m) => {
-          if (m.taskName){
+          if ('taskName' in m){
             expect(m.taskName).to.equal(fullTaskName);
             expect(m.attempts).to.deep.equal(1);
             expect(m.context).to.deep.equal(taskContext);
             taskConsumed = true;
           }
-          if (m.eventName){
+          if ('eventName' in m){
             expect(m.eventName).to.equal(fullEventName);
             expect(m.attempts).to.deep.equal(1);
             expect(m.context).to.deep.equal(eventContext);
@@ -64,7 +64,7 @@ describe('Integration tests', () => {
     it('should be able to reenqueue a failed message', async () => {
       return new Promise(async (resolve) => {
         let punishMeDaddy = true;
-        const fn = async (c, m) => {
+        const fn: TaskConsumerFunction = async (c, m) => {
           if (punishMeDaddy){
             throw new Error('message processing function rejected');
           } else {
@@ -77,7 +77,7 @@ describe('Integration tests', () => {
         await rabbit.registerTaskConsumer(taskName, fn, consumerOptions);
         await rabbit.registerFailedMessageConsumer(async (q, m) => {
           punishMeDaddy = false;
-          rabbit.enqueueMessage(q, m, enqueueMessageOptions);
+          rabbit.enqueueMessage(q, m);
         }, failedMessageConsumerOptions);
         await rabbit.enqueueTask(fullTaskName, taskContext, enqueueOptions);
       });

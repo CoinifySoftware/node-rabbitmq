@@ -1,24 +1,22 @@
-'use strict';
-
-const CoinifyRabbit = require('../../../lib/CoinifyRabbit'),
-  sinon = require('sinon'),
-  _ = require('lodash');
+import { expect } from 'chai';
+import sinon from 'sinon';
+import CoinifyRabbit from '../../../src/CoinifyRabbit';
 
 describe('CoinifyRabbit', () => {
 
   describe('#_handleConsumeMessage', () => {
 
-    let _getChannelStub,
-      consumeFnStub,
-      channelAckStub,
-      _handleConsumeRejectionStub,
+    let _getChannelStub: sinon.SinonStub,
+      consumeFnStub: sinon.SinonStub,
+      channelAckStub: sinon.SinonStub,
+      _handleConsumeRejectionStub: sinon.SinonStub,
 
-      rabbit;
+      rabbit: CoinifyRabbit;
 
     const fullTaskName = 'service.the-task';
-    let task,
-      message,
-      options;
+    let task: any,
+      message: any,
+      options: any;
 
     beforeEach(() => {
       rabbit = new CoinifyRabbit();
@@ -40,7 +38,7 @@ describe('CoinifyRabbit', () => {
       consumeFnStub = sinon.stub();
       _getChannelStub = sinon.stub(rabbit, '_getChannel');
       _getChannelStub.resolves({ ack: channelAckStub });
-      _handleConsumeRejectionStub = sinon.stub(rabbit, '_handleConsumeRejection');
+      _handleConsumeRejectionStub = sinon.stub(rabbit as any, '_handleConsumeRejection');
     });
 
     afterEach(() => {
@@ -52,7 +50,7 @@ describe('CoinifyRabbit', () => {
       consumeFnStub.resolves();
       channelAckStub.resolves();
 
-      expect(await rabbit._handleConsumeMessage(message, 'task', options, consumeFnStub)).to.equal(true);
+      expect(await (rabbit as any)._handleConsumeMessage(message, 'task', options, consumeFnStub)).to.equal(true);
 
       expect(consumeFnStub.calledOnce).to.equal(true);
       expect(consumeFnStub.firstCall.args).to.deep.equal([ task.context, task ]);
@@ -69,7 +67,7 @@ describe('CoinifyRabbit', () => {
       channelAckStub.resolves();
       _handleConsumeRejectionStub.resolves();
 
-      await rabbit._handleConsumeMessage(message, 'task', options, consumeFnStub);
+      await (rabbit as any)._handleConsumeMessage(message, 'task', options, consumeFnStub);
 
       expect(consumeFnStub.calledOnce).to.equal(true);
       expect(consumeFnStub.firstCall.args).to.deep.equal([ task.context, task ]);
@@ -86,7 +84,7 @@ describe('CoinifyRabbit', () => {
       options.onCancel = sinon.stub();
       options.onCancel.resolves(onCancelResolution);
 
-      expect(await rabbit._handleConsumeMessage(null, 'task', options, consumeFnStub)).to.equal(onCancelResolution);
+      expect(await (rabbit as any)._handleConsumeMessage(null, 'task', options, consumeFnStub)).to.equal(onCancelResolution);
 
       expect(options.onCancel.calledOnce).to.equal(true);
 

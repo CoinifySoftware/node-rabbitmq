@@ -1,6 +1,6 @@
 /// <reference types="node" />
-import amqplib from 'amqplib';
-import EventEmitter from 'events';
+import * as amqplib from 'amqplib';
+import { EventEmitter } from 'events';
 import CoinifyRabbitConfiguration, { CoinifyRabbitConnectionConfiguration } from './CoinifyRabbitConfiguration';
 import Logger from './interfaces/Logger';
 import DeepPartial from './DeepPartial';

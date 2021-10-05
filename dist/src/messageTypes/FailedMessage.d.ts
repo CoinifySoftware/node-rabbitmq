@@ -1,4 +1,4 @@
-import amqplib from 'amqplib';
+import * as amqplib from 'amqplib';
 import Event, { OnEventErrorFunctionParams } from './Event';
 import Task, { OnTaskErrorFunctionParams } from './Task';
 export declare type FailedMessage = Event | Task;

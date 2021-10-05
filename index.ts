@@ -1,4 +1,4 @@
-import CoinifyRabbit from './src/CoinifyRabbit';
+import CoinifyRabbit, { CoinifyRabbitConstructorOptions } from './src/CoinifyRabbit';
 import CoinifyRabbitConfiguration, { CoinifyRabbitConnectionConfiguration } from './src/CoinifyRabbitConfiguration';
 import Logger from './src/interfaces/Logger';
 import Event, {
@@ -19,6 +19,7 @@ import Task, {
 } from './src/messageTypes/Task';
 
 export default CoinifyRabbit;
+export { CoinifyRabbitConstructorOptions };
 
 export { CoinifyRabbitConfiguration, CoinifyRabbitConnectionConfiguration };
 export { Logger };

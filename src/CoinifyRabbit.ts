@@ -1,14 +1,12 @@
 /* eslint-disable @typescript-eslint/member-ordering */
-'use strict';
 
 import _ from 'lodash';
-import amqplib from 'amqplib';
+import * as amqplib from 'amqplib';
 import backoff from 'backoff';
 import consoleLogLevel from 'console-log-level';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
-import util from 'util';
-import EventEmitter from 'events';
+import { EventEmitter } from 'events';
 import CoinifyRabbitConfiguration, { CoinifyRabbitConnectionConfiguration, DEFAULT_CONFIGURATION } from './CoinifyRabbitConfiguration';
 import Logger from './interfaces/Logger';
 import DeepPartial from './DeepPartial';
@@ -1108,7 +1106,3 @@ export default class CoinifyRabbit extends EventEmitter {
     CoinifyRabbit._decideConsumerRetry(0, options);
   }
 }
-
-util.inherits(CoinifyRabbit, EventEmitter);
-
-module.exports = CoinifyRabbit;

@@ -1,18 +1,36 @@
-'use strict';
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const lodash_1 = __importDefault(require("lodash"));
-const amqplib_1 = __importDefault(require("amqplib"));
+const amqplib = __importStar(require("amqplib"));
 const backoff_1 = __importDefault(require("backoff"));
 const console_log_level_1 = __importDefault(require("console-log-level"));
 const crypto_1 = __importDefault(require("crypto"));
 const uuid_1 = require("uuid");
-const util_1 = __importDefault(require("util"));
-const events_1 = __importDefault(require("events"));
+const events_1 = require("events");
 const CoinifyRabbitConfiguration_1 = require("./CoinifyRabbitConfiguration");
-class CoinifyRabbit extends events_1.default {
+class CoinifyRabbit extends events_1.EventEmitter {
     constructor(options) {
         super();
         this.consumers = [];
@@ -188,7 +206,7 @@ class CoinifyRabbit extends events_1.default {
                     try {
                         const connectionConfig = lodash_1.default.get(this.config, 'connection');
                         this.logger.info({ connectionConfig: lodash_1.default.omit(connectionConfig, ['password']) }, 'Opening connection to RabbitMQ');
-                        this._conn = await amqplib_1.default.connect(CoinifyRabbit._generateConnectionUrl(connectionConfig), { clientProperties: { connection_name: lodash_1.default.get(this.config, 'service.name') } });
+                        this._conn = await amqplib.connect(CoinifyRabbit._generateConnectionUrl(connectionConfig), { clientProperties: { connection_name: lodash_1.default.get(this.config, 'service.name') } });
                         this._conn.on('error', err => {
                             this.logger.warn({ err }, 'RabbitMQ connection error');
                             delete this._conn;
@@ -589,5 +607,3 @@ class CoinifyRabbit extends events_1.default {
     }
 }
 exports.default = CoinifyRabbit;
-util_1.default.inherits(CoinifyRabbit, events_1.default);
-module.exports = CoinifyRabbit;

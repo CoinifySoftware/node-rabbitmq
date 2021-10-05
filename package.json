@@ -1,6 +1,6 @@
 {
   "name": "@coinify/rabbitmq",
-  "version": "2.0.0-beta-5",
+  "version": "2.0.0",
   "description": "Coinify RabbitMQ client with support for events and tasks",
   "main": "dist/index.js",
   "types": "dist/index",

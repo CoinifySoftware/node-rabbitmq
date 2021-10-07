@@ -1,4 +1,4 @@
-import amqplib from 'amqplib';
+import * as amqplib from 'amqplib';
 import { ServiceConfiguration } from '../CoinifyRabbitConfiguration';
 import { RetryConfiguration } from '../types';
 export default interface Event<Context = any> {

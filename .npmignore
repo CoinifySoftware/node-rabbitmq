@@ -1,7 +1,14 @@
 node_modules
-src
+./src
 test
-tsconfig.json
+scripts
+
+.eslint*
 .editorconfig
+.mocharc.*
+.tool-versions
 .vscode
 .idea
+
+index.ts
+tsconfig.json

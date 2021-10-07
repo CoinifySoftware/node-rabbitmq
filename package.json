@@ -1,6 +1,6 @@
 {
   "name": "@coinify/rabbitmq",
-  "version": "2.0.0-beta-1",
+  "version": "2.0.0",
   "description": "Coinify RabbitMQ client with support for events and tasks",
   "main": "dist/index.js",
   "types": "dist/index",
@@ -19,6 +19,7 @@
     "test-integration-watch": "mocha --config .mocharc.integration.json --watch"
   },
   "dependencies": {
+    "@types/amqplib": "^0.8.2",
     "amqplib": "^0.8.0",
     "backoff": "^2.5.0",
     "console-log-level": "^1.4.1",
@@ -27,7 +28,6 @@
   },
   "devDependencies": {
     "@coinify/eslint-config-coinify": "^2.1.0",
-    "@types/amqplib": "^0.8.2",
     "@types/backoff": "^2.5.2",
     "@types/chai": "^4.2.22",
     "@types/chai-as-promised": "^7.1.4",

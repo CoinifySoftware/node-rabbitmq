@@ -8,7 +8,7 @@ const sinon_1 = __importDefault(require("sinon"));
 const chai_1 = __importDefault(require("chai"));
 const chai_as_promised_1 = __importDefault(require("chai-as-promised"));
 const chai_subset_1 = __importDefault(require("chai-subset"));
-const lodash_1 = __importDefault(require("lodash"));
+const lodash_defaultsdeep_1 = __importDefault(require("lodash.defaultsdeep"));
 require("mocha");
 const CoinifyRabbit_1 = __importDefault(require("../src/CoinifyRabbit"));
 chai_1.default.use(chai_as_promised_1.default);
@@ -29,7 +29,7 @@ function createRabbitMQTestInstance(options) {
             failed: 'test._failed'
         }
     };
-    return new CoinifyRabbit_1.default(lodash_1.default.defaultsDeep(defaultTestOptions, options));
+    return new CoinifyRabbit_1.default((0, lodash_defaultsdeep_1.default)(defaultTestOptions, options));
 }
 exports.createRabbitMQTestInstance = createRabbitMQTestInstance;
 async function disableFailedMessageQueue(rabbit) {

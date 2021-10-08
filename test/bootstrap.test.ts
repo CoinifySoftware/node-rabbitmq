@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import chaiSubset from 'chai-subset';
-import _ from 'lodash';
+import defaultsDeep from 'lodash.defaultsdeep';
 import 'mocha';
 import CoinifyRabbit, { CoinifyRabbitConstructorOptions } from '../src/CoinifyRabbit';
 import CoinifyRabbitConfiguration from '../src/CoinifyRabbitConfiguration';
@@ -31,7 +31,7 @@ export function createRabbitMQTestInstance(options?: CoinifyRabbitConstructorOpt
       failed: 'test._failed'
     }
   };
-  return new CoinifyRabbit(_.defaultsDeep(defaultTestOptions, options ));
+  return new CoinifyRabbit(defaultsDeep(defaultTestOptions, options ));
 }
 
 export async function disableFailedMessageQueue(rabbit: CoinifyRabbit) {

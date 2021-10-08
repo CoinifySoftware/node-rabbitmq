@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/member-ordering */
 
-import _ from 'lodash';
+import cloneDeep from 'lodash.clonedeep';
+import defaultsDeep from 'lodash.defaultsdeep';
+import truncate from 'lodash.truncate';
 import * as amqplib from 'amqplib';
 import backoff from 'backoff';
 import consoleLogLevel from 'console-log-level';
@@ -12,7 +14,7 @@ import Logger from './interfaces/Logger';
 import DeepPartial from './DeepPartial';
 import { EnqueueMessageOptions, RetryConfiguration } from './types';
 import Event, { EventConsumer, EventConsumerFunction, OnEventErrorFunctionParams, RegisterEventConsumerOptions } from './messageTypes/Event';
-import Task, { OnTaskErrorFunctionParams, RegisterTaskConsumerOptions, TaskConsumer, TaskConsumerFunction } from './messageTypes/Task';
+import Task, { EnqueueTaskOptions, OnTaskErrorFunctionParams, RegisterTaskConsumerOptions, TaskConsumer, TaskConsumerFunction } from './messageTypes/Task';
 import { FailedMessage, FailedMessageConsumer, FailedMessageConsumerFunction, RegisterFailedMessageConsumerOptions } from './messageTypes/FailedMessage';
 
 export interface CoinifyRabbitConstructorOptions extends DeepPartial<CoinifyRabbitConfiguration> {
@@ -49,9 +51,9 @@ export default class CoinifyRabbit extends EventEmitter {
     super();
 
     const { logger, ...config } = options ?? {};
-    this.config = _.defaultsDeep({}, config, DEFAULT_CONFIGURATION);
+    this.config = defaultsDeep({}, config, DEFAULT_CONFIGURATION);
 
-    this.logger = logger ?? ( consoleLogLevel({ level: this.config.defaultLogLevel }) as Logger );
+    this.logger = logger ?? (consoleLogLevel({ level: this.config.defaultLogLevel }) as Logger);
 
     if (!this.config.service.name) {
       throw new Error('options.service.name must be set');
@@ -144,22 +146,22 @@ export default class CoinifyRabbit extends EventEmitter {
    *
    * The full task name is used as the routing key
    *   */
-  async enqueueTask(fullTaskName: string, context: unknown, options?: EnqueueMessageOptions) {
+  async enqueueTask(fullTaskName: string, context: unknown, options?: EnqueueTaskOptions) {
     const serviceName = options?.service?.name ?? this.config.service.name;
 
     const channel = await this._getChannel();
-    const delayMillis = _.get(options, 'delayMillis', 0);
+    const delayMillis = options?.delayMillis ?? 0;
 
     let exchangeName;
     const publishOptions: amqplib.Options.Publish = {};
     if (delayMillis > 0) {
-      const delayedAmqpOptions = _.pick(options, [ 'exchange', 'queue' ]);
+      const delayedAmqpOptions = { exchange: options?.exchange };
       const { delayedExchangeName, delayedQueueName } = await this._assertDelayedTaskExchangeAndQueue(delayMillis, delayedAmqpOptions);
       exchangeName = delayedExchangeName;
       publishOptions.BCC = delayedQueueName;
     } else {
-      exchangeName = _.get(this.config, 'exchanges.tasksTopic');
-      await channel.assertExchange(exchangeName, 'topic', _.get(options, 'exchange', {}));
+      exchangeName = this.config.exchanges.tasksTopic;
+      await channel.assertExchange(exchangeName, 'topic', options?.exchange);
     }
 
     this.logger.trace({ fullTaskName, context, exchangeName, options, publishOptions }, 'enqueueTask()');
@@ -171,7 +173,7 @@ export default class CoinifyRabbit extends EventEmitter {
       time: options?.time ? new Date(options.time).getTime() : Date.now(),
       attempts: 0,
       origin: serviceName,
-      delayMillis: delayMillis > 0 && delayMillis
+      delayMillis: delayMillis > 0 ? delayMillis : undefined
     };
 
     const message = Buffer.from(JSON.stringify(task));
@@ -347,10 +349,10 @@ export default class CoinifyRabbit extends EventEmitter {
         // Create and start executing promise immediately
         this._getConnectionPromise = (async () => {
           try {
-            const connectionConfig = _.get(this.config, 'connection');
-            this.logger.info({ connectionConfig: _.omit(connectionConfig, [ 'password' ]) }, 'Opening connection to RabbitMQ');
+            const connectionConfig = this.config.connection;
+            this.logger.info({ connectionConfig: { ...connectionConfig, password: undefined } }, 'Opening connection to RabbitMQ');
 
-            this._conn = await amqplib.connect(CoinifyRabbit._generateConnectionUrl(connectionConfig), { clientProperties: { connection_name: _.get(this.config, 'service.name') } });
+            this._conn = await amqplib.connect(CoinifyRabbit._generateConnectionUrl(connectionConfig), { clientProperties: { connection_name: this.config.service.name } });
             this._conn.on('error', err => {
               // Basic error handling: Log error and discard current connection, so a new one will be created next time
               this.logger.warn({ err }, 'RabbitMQ connection error');
@@ -392,7 +394,7 @@ export default class CoinifyRabbit extends EventEmitter {
    */
   static _generateConnectionUrl(connectionConfig: CoinifyRabbitConnectionConfiguration) {
     // Check for valid protocol
-    if (!_.includes([ 'amqp', 'amqps' ], connectionConfig.protocol)) {
+    if (![ 'amqp', 'amqps' ].includes(connectionConfig.protocol)) {
       throw new Error(`Invalid protocol '${connectionConfig.protocol}'. Must be 'amqp' or 'amqps'`);
     }
 
@@ -426,7 +428,7 @@ export default class CoinifyRabbit extends EventEmitter {
   private async _onChannelOpened(channel: amqplib.Channel) {
     this.logger.info({}, 'Channel opened');
 
-    const prefetch = _.get(this.config, 'channel.prefetch');
+    const prefetch = this.config.channel.prefetch;
     await channel.prefetch(prefetch, true);
 
     await this._recreateRegisteredConsumers();
@@ -439,7 +441,7 @@ export default class CoinifyRabbit extends EventEmitter {
    * @private
    */
   private async _recreateRegisteredConsumers() {
-    const consumers: Consumer[] = _.cloneDeep(this.consumers);
+    const consumers: Consumer[] = cloneDeep(this.consumers);
     this.consumers = [];
 
     /*
@@ -448,13 +450,13 @@ export default class CoinifyRabbit extends EventEmitter {
     for (const consumer of consumers) {
       switch (consumer.type) {
         case 'event':
-          await this.registerEventConsumer(consumer.key, consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag } );
+          await this.registerEventConsumer(consumer.key, consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag });
           break;
         case 'task':
-          await this.registerTaskConsumer(consumer.key, consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag } );
+          await this.registerTaskConsumer(consumer.key, consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag });
           break;
         case 'message':
-          await this.registerFailedMessageConsumer(consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag } );
+          await this.registerFailedMessageConsumer(consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag });
           break;
         default:
           throw new Error(`Internal error: Unknown consumer type '${(consumer as any).type}'`);
@@ -541,25 +543,25 @@ export default class CoinifyRabbit extends EventEmitter {
     /*
      * Log information about shutdown process
      */
-    const activeTaskConsumptions = this.activeMessageConsumptions.filter(c => 'taskName' in c);
-    const activeEventConsumptions = this.activeMessageConsumptions.filter(c => 'eventName' in c);
+    const activeTaskConsumptions = this.activeMessageConsumptions.filter((m): m is Task => 'taskName' in m);
+    const activeEventConsumptions: Event[] = this.activeMessageConsumptions.filter((m): m is Event => 'eventName' in m);
 
     this.logger.info({
-      registeredConsumers: JSON.stringify(this.consumers.map(c => _.pick(c, [ 'type', 'key', 'consumerTag' ]))),
+      registeredConsumers: JSON.stringify(this.consumers.map(({ type, key, consumerTag }) => ({ type, key, consumerTag }))),
       activeConsumption: {
-        tasks: JSON.stringify(activeTaskConsumptions.map(c => _.pick(c, [ 'uuid', 'taskName' ]))),
-        events: JSON.stringify(activeEventConsumptions.map(c => _.pick(c, [ 'uuid', 'eventName' ])))
+        tasks: JSON.stringify(activeTaskConsumptions.map(({ uuid, taskName }) => ({ uuid, taskName }))),
+        events: JSON.stringify(activeEventConsumptions.map(({ uuid, eventName }) => ({ uuid, eventName })))
       },
       timeout
     }, 'Shutting down RabbitMQ');
 
-    if (_.size(this.consumers)) {
+    if (this.consumers.length > 0) {
       await this._cancelAllConsumers();
       await this._waitForConsumersToFinish(timeout);
     }
 
     // If there are still active consumers, NACK 'em all
-    if (_.size(this.activeMessageConsumptions)) {
+    if (this.activeMessageConsumptions.length > 0) {
       const channel = await this._getChannel();
       channel.nackAll();
     }
@@ -602,20 +604,26 @@ export default class CoinifyRabbit extends EventEmitter {
    * @private
    */
   private _waitForConsumersToFinish(timeout?: number) {
-    if (_.size(this.activeMessageConsumptions) === 0) {
+    if (this.activeMessageConsumptions.length === 0) {
       return;
     }
 
     return new Promise(resolve => {
-      const resolveOnce = _.once(resolve);
+      let resolved = false;
+      const resolveOnce = <T>(arg: T) => {
+        if (!resolved) {
+          resolved = true;
+          resolve(arg);
+        }
+      };
 
       this.on('messageConsumed', () => {
-        if (_.size(this.activeMessageConsumptions) === 0) {
+        if (this.activeMessageConsumptions.length === 0) {
           resolveOnce(undefined);
         }
       });
 
-      if (timeout && _.isInteger(timeout) && timeout > 0) {
+      if (timeout && Number.isInteger(timeout) && timeout > 0) {
         setTimeout(resolveOnce, timeout);
       }
     });
@@ -704,15 +712,16 @@ export default class CoinifyRabbit extends EventEmitter {
     let consumeError = null;
     try {
       const startTime = Date.now();
-      const consumeResult = await consumeFn(_.cloneDeep(context), _.cloneDeep(msgObj));
+      const consumeResult = await consumeFn(cloneDeep(context), cloneDeep(msgObj));
       const consumeTimeMillis = Date.now() - startTime;
 
-      const consumeResultTruncated = _.truncate(JSON.stringify(consumeResult), { length: 4096 });
+      const consumeResultTruncated = truncate(JSON.stringify(consumeResult), { length: 4096 });
       this.logger.info({ [messageType]: msgObj, consumeResult: consumeResultTruncated, consumeTimeMillis }, `${messageType} ${name} consumed`);
     } catch (err) {
       consumeError = err;
     }
-    _.pull(this.activeMessageConsumptions, msgObj);
+
+    this.activeMessageConsumptions = this.activeMessageConsumptions.filter(msg => msg !== msgObj);
     this.emit('messageConsumed', msgObj);
 
     /*
@@ -769,7 +778,7 @@ export default class CoinifyRabbit extends EventEmitter {
       throw new Error(`Invalid type. Given: ${messageType}, allowed: [${allowedTypes.join(', ')}]`);
     }
 
-    const retryResponse = CoinifyRabbit._decideConsumerRetry(messageObject.attempts, _.get(options, 'retry'));
+    const retryResponse = CoinifyRabbit._decideConsumerRetry(messageObject.attempts, options.retry);
     let { shouldRetry } = retryResponse;
     const { delaySeconds } = retryResponse;
 
@@ -813,7 +822,7 @@ export default class CoinifyRabbit extends EventEmitter {
       this.logger.error({ err, [messageType]: messageObject }, `${messageType} error handling function rejected!`);
     }
 
-    const retryAmqpOptions = _.pick(options, [ 'exchange', 'queue' ]);
+    const retryAmqpOptions = { exchange: options.exchange, queue: options.queue };
 
     const publishOptions: amqplib.Options.Publish = {};
     let republishExchangeName;
@@ -830,7 +839,7 @@ export default class CoinifyRabbit extends EventEmitter {
       republishExchangeName = await this._assertDeadLetterExchangeAndQueue(retryAmqpOptions);
     }
 
-    messageObject = _.cloneDeep(messageObject);
+    messageObject = cloneDeep(messageObject);
     messageObject.attempts = (messageObject.attempts || 0) + 1;
     const updatedMessage = Buffer.from(JSON.stringify(messageObject));
 
@@ -843,7 +852,9 @@ export default class CoinifyRabbit extends EventEmitter {
       const err = new Error(`channel.publish() to exchange '${republishExchangeName}' with routing key '${routingKey}'`
         + ` resolved to ${JSON.stringify(publishResult)}`);
       // Add extra properties to error
-      _.assign(err, { republishExchangeName, routingKey, updatedMessage });
+      (err as any).republishExchangeName = republishExchangeName;
+      (err as any).routingKey = routingKey;
+      (err as any).updatedMessage = updatedMessage;
       throw err;
     }
 
@@ -888,17 +899,17 @@ export default class CoinifyRabbit extends EventEmitter {
 
     try {
       const startTime = Date.now();
-      const consumeResult = await consumeFn(_.cloneDeep(message.fields.routingKey), _.cloneDeep(msgObj));
+      const consumeResult = await consumeFn(cloneDeep(message.fields.routingKey), cloneDeep(msgObj));
       const consumeTimeMillis = Date.now() - startTime;
 
-      const consumeResultTruncated = _.truncate(JSON.stringify(consumeResult), { length: 4096 });
+      const consumeResultTruncated = truncate(JSON.stringify(consumeResult), { length: 4096 });
       channel.ack(message);
       this.logger.info({ message: msgObj, consumeResult: consumeResultTruncated, consumeTimeMillis }, 'message consumed');
     } catch (err) {
       this.logger.warn({ err, message: msgObj }, 'Error consuming message from failed queue');
       channel.nack(message);
     }
-    _.pull(this.activeMessageConsumptions, msgObj);
+    this.activeMessageConsumptions = this.activeMessageConsumptions.filter(msg => msg !== msgObj);
     this.emit('messageConsumed', msgObj);
   }
 
@@ -944,13 +955,13 @@ export default class CoinifyRabbit extends EventEmitter {
     const channel = await this._getChannel();
     const delayMs = Math.round(delaySeconds * 1000);
 
-    const retryExchangeName = _.get(this.config, 'exchanges.retry');
-    const retryQueueName = _.get(this.config, 'queues.retryPrefix') + '.' + delayMs + 'ms';
-    const exchangeOptions = _.defaultsDeep({}, _.get(options, 'exchange', {}), { autoDelete: true });
+    const retryExchangeName = this.config.exchanges.retry;
+    const retryQueueName = this.config.queues.retryPrefix + '.' + delayMs + 'ms';
+    const exchangeOptions = defaultsDeep({}, options?.exchange, { autoDelete: true });
 
     await channel.assertExchange(retryExchangeName, 'direct', exchangeOptions);
 
-    const queueOptions = _.defaultsDeep({}, _.get(options, 'queue', {}), {
+    const queueOptions = defaultsDeep({}, options?.queue, {
       // Queue expires 3 seconds after it was declared the last time
       // expires: 3 * 1000 + delayMs,
       // autoDelete: false,
@@ -1049,10 +1060,8 @@ export default class CoinifyRabbit extends EventEmitter {
       return { shouldRetry: false, delaySeconds };
     }
 
-    options = options || {};
-
-    const maxAttempts = _.get(options, 'maxAttempts', 12);
-    if (!_.isInteger(maxAttempts) || maxAttempts < -1) {
+    const maxAttempts = options.maxAttempts ?? 12;
+    if (!Number.isInteger(maxAttempts) || maxAttempts < -1) {
       throw new Error('Retry maxAttempts must be -1, 0, or a positive integer');
     }
 
@@ -1061,25 +1070,24 @@ export default class CoinifyRabbit extends EventEmitter {
       return { shouldRetry: false, delaySeconds };
     }
 
-    delaySeconds = _.get(options, 'backoff.delay', 16);
-    if (!_.isNumber(delaySeconds) || delaySeconds < 0) {
+    delaySeconds = options.backoff?.delay ?? 16;
+    if (!Number.isFinite(delaySeconds) || delaySeconds < 0) {
       throw new Error('Retry: backoff.delay must be a strictly positive number');
     }
 
     // Then, it's time to compute the delay until retry
-    const backoffType = _.get(options, 'backoff.type', 'fixed');
-    switch (backoffType) {
+    switch (options.backoff?.type) {
       case 'exponential': {
-        const eBase = _.get(options, 'backoff.base', 2);
+        const eBase = options.backoff?.base ?? 2;
         delaySeconds = delaySeconds * eBase ** currentAttempt;
         break;
       }
-      case 'fixed': {
+      case undefined:
+      case 'fixed':
         // Nothing to do here. delaySeconds is already set
         break;
-      }
       default:
-        throw new Error(`Retry: invalid backoff.type: '${backoffType}'`);
+        throw new Error(`Retry: invalid backoff.type: '${(options.backoff as any)?.type}'`);
     }
 
     return { shouldRetry: true, delaySeconds };

@@ -4,7 +4,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const chai_1 = require("chai");
-const lodash_1 = __importDefault(require("lodash"));
 const sinon_1 = __importDefault(require("sinon"));
 const CoinifyRabbit_1 = __importDefault(require("../../../src/CoinifyRabbit"));
 describe('CoinifyRabbit', () => {
@@ -57,7 +56,7 @@ describe('CoinifyRabbit', () => {
             (0, chai_1.expect)(_decideConsumerRetryStub.calledOnce).to.equal(true);
             (0, chai_1.expect)(_decideConsumerRetryStub.firstCall.args).to.deep.equal([task.attempts, options.retry]);
             (0, chai_1.expect)(_assertRetryExchangeAndQueueStub.calledOnce).to.equal(true);
-            (0, chai_1.expect)(_assertRetryExchangeAndQueueStub.firstCall.args).to.deep.equal([delaySeconds, lodash_1.default.pick(options, ['exchange', 'queue'])]);
+            (0, chai_1.expect)(_assertRetryExchangeAndQueueStub.firstCall.args).to.deep.equal([delaySeconds, { exchange: options.exchange, queue: options.queue }]);
             (0, chai_1.expect)(_assertDeadLetterExchangeAndQueueStub.notCalled).to.equal(true);
             (0, chai_1.expect)(channelPublishStub.calledOnce).to.equal(true);
             (0, chai_1.expect)(channelPublishStub.firstCall.args).to.have.lengthOf(4);
@@ -66,7 +65,7 @@ describe('CoinifyRabbit', () => {
             (0, chai_1.expect)(channelPublishStub.firstCall.args[2]).to.be.instanceof(Buffer);
             (0, chai_1.expect)(channelPublishStub.firstCall.args[3]).to.deep.equal({ BCC: retryQueueName });
             const messageDecoded = JSON.parse(channelPublishStub.firstCall.args[2].toString());
-            (0, chai_1.expect)(messageDecoded).to.deep.equal(lodash_1.default.set(task, 'attempts', task.attempts + 1));
+            (0, chai_1.expect)(messageDecoded).to.deep.equal({ ...task, attempts: task.attempts + 1 });
         });
         it('should re-publish to dead letter queue if _decideConsumerRetry() returns shouldRetry: false', async () => {
             await rabbit._handleConsumeRejection(message, 'task', task, consumeError, options);
@@ -74,7 +73,7 @@ describe('CoinifyRabbit', () => {
             (0, chai_1.expect)(_decideConsumerRetryStub.firstCall.args).to.deep.equal([task.attempts, options.retry]);
             (0, chai_1.expect)(_assertRetryExchangeAndQueueStub.notCalled).to.equal(true);
             (0, chai_1.expect)(_assertDeadLetterExchangeAndQueueStub.calledOnce).to.equal(true);
-            (0, chai_1.expect)(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([lodash_1.default.pick(options, ['exchange', 'queue'])]);
+            (0, chai_1.expect)(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([{ exchange: options.exchange, queue: options.queue }]);
             (0, chai_1.expect)(channelPublishStub.calledOnce).to.equal(true);
             (0, chai_1.expect)(channelPublishStub.firstCall.args).to.have.lengthOf(4);
             (0, chai_1.expect)(channelPublishStub.firstCall.args[0]).to.equal(retryExchangeName);
@@ -82,7 +81,7 @@ describe('CoinifyRabbit', () => {
             (0, chai_1.expect)(channelPublishStub.firstCall.args[2]).to.be.instanceof(Buffer);
             (0, chai_1.expect)(channelPublishStub.firstCall.args[3]).to.deep.equal({});
             const messageDecoded = JSON.parse(channelPublishStub.firstCall.args[2].toString());
-            (0, chai_1.expect)(messageDecoded).to.deep.equal(lodash_1.default.set(task, 'attempts', task.attempts + 1));
+            (0, chai_1.expect)(messageDecoded).to.deep.equal({ ...task, attempts: task.attempts + 1 });
         });
         it('should re-publish to dead letter queue if consumeError contains noRetry: true property', async () => {
             const consumeError = new Error('Error that we should not retry on');
@@ -92,7 +91,7 @@ describe('CoinifyRabbit', () => {
             await rabbit._handleConsumeRejection(message, 'task', task, consumeError, options);
             (0, chai_1.expect)(_assertRetryExchangeAndQueueStub.notCalled).to.equal(true);
             (0, chai_1.expect)(_assertDeadLetterExchangeAndQueueStub.calledOnce).to.equal(true);
-            (0, chai_1.expect)(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([lodash_1.default.pick(options, ['exchange', 'queue'])]);
+            (0, chai_1.expect)(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([{ exchange: options.exchange, queue: options.queue }]);
             (0, chai_1.expect)(channelPublishStub.calledOnce).to.equal(true);
             (0, chai_1.expect)(channelPublishStub.firstCall.args).to.have.lengthOf(4);
             (0, chai_1.expect)(channelPublishStub.firstCall.args[0]).to.equal(retryExchangeName);

@@ -1,5 +1,6 @@
 import { expect } from 'chai';
-import _ from 'lodash';
+import chunk from 'lodash.chunk';
+import { RegisterTaskConsumerOptions } from '../..';
 import CoinifyRabbit from '../../src/CoinifyRabbit';
 import { createRabbitMQTestInstance, disableFailedMessageQueue, reenableFailedMessageQueue } from '../bootstrap.test';
 
@@ -44,7 +45,7 @@ describe('Integration tests', () => {
       const uuid = '12341234-1234-1234-1234-123412341234';
       const time = 1511944077916;
 
-      const enqueueOptions = _.defaults({ uuid, time }, enqueueTaskOptions);
+      const enqueueOptions = { ...enqueueTaskOptions, uuid, time };
 
       return new Promise(async (resolve) => {
         await rabbit.registerTaskConsumer(taskName, (c, t) => {
@@ -61,9 +62,7 @@ describe('Integration tests', () => {
       const taskCount = 3;
 
       return new Promise(async (resolve) => {
-        const contexts = _.map(_.range(taskCount), i => {
-          return { taskNumber: i };
-        });
+        const contexts = Array.from({ length: taskCount }, (_, taskNumber) => ({ taskNumber }));
 
         let tasksConsumed = 0;
 
@@ -88,14 +87,12 @@ describe('Integration tests', () => {
       const consumerCount = 3;
       const taskCount = consumerCount * 3;
 
-      const consumerIds = _.range(consumerCount);
+      const consumerIds = Array.from({ length: consumerCount }, (_, i) => i);
       const tasksConsumed: number[] = [];
       const tasksConsumedByConsumer: { [consumerId: number]: number } = {};
 
-      const taskIds = _.range(taskCount);
-      const contexts = _.map(taskIds, i => {
-        return { taskNumber: i };
-      });
+      const taskIds = Array.from({ length: taskCount }, (_, i) => i);
+      const contexts = taskIds.map(i => ({ taskNumber: i }));
 
       return new Promise(async (resolve) => {
         for (const i of consumerIds) {
@@ -106,8 +103,8 @@ describe('Integration tests', () => {
             tasksConsumedByConsumer[i] = (tasksConsumedByConsumer[i] || 0) + 1;
 
             if (tasksConsumed.length === taskCount) {
-              const tasksConsumedSorted = _.sortBy(tasksConsumed);
-              expect(tasksConsumedSorted).to.deep.equal(taskIds);
+              tasksConsumed.sort();
+              expect(tasksConsumed).to.deep.equal(taskIds);
 
               resolve(undefined);
             }
@@ -123,7 +120,7 @@ describe('Integration tests', () => {
     it('should be able to consume the same task in all instances of the same service', () => {
       const consumerCount = 3;
 
-      const consumerIds = _.range(consumerCount);
+      const consumerIds = Array.from({ length: consumerCount }, (_, i) => i);
       // List of IDs of tasks consumed by all consumers
       let tasksConsumed = 0;
       // Number of tasks consumed by each consumer
@@ -131,7 +128,7 @@ describe('Integration tests', () => {
 
       return new Promise(async (resolve) => {
         for (const i of consumerIds) {
-          const consumeOptions = _.defaultsDeep({}, registerTaskConsumerOptions, { uniqueQueue: true });
+          const consumeOptions = { ...registerTaskConsumerOptions, uniqueQueue: true };
           await rabbit.registerTaskConsumer(taskName, (c, e) => { // eslint-disable-line no-loop-func
             expect(e.taskName).to.equal(fullTaskName);
 
@@ -144,12 +141,10 @@ describe('Integration tests', () => {
             // If all tasks have now been consumed by all consumers
             if (tasksConsumed === consumerCount) {
               // All consumers have consumed something
-              expect(_.size(tasksConsumedByConsumer)).to.equal(consumerCount);
+              expect(Object.values(tasksConsumedByConsumer)).to.have.lengthOf(consumerCount);
 
               // Check that each consumer has consumed the task
-              _.forOwn(tasksConsumedByConsumer, tasksConsumed => {
-                expect(tasksConsumed).to.equal(1);
-              });
+              expect(Object.values(tasksConsumedByConsumer).every(tasksConsumed => tasksConsumed === 1)).to.equal(true);
 
               resolve(undefined);
             }
@@ -166,7 +161,7 @@ describe('Integration tests', () => {
         // Retry 4 times with 0.25 second delay
         const delayMillis = 250;
         const maxAttempts = 4;
-        const consumeOptions = _.defaultsDeep({ retry: { backoff: { type: 'fixed', delay: delayMillis / 1000 }, maxAttempts } }, registerTaskConsumerOptions);
+        const consumeOptions: RegisterTaskConsumerOptions = { ...registerTaskConsumerOptions, retry: { backoff: { type: 'fixed', delay: delayMillis / 1000 }, maxAttempts } };
         let startTime = Date.now();
         let attempt = 0;
 
@@ -204,7 +199,7 @@ describe('Integration tests', () => {
       const taskCount = 3 * prefetch;
       const consumeTime = 250;
 
-      const consumerOptions = _.defaultsDeep({ consumer: { prefetch } }, registerTaskConsumerOptions);
+      const consumerOptions = { ...registerTaskConsumerOptions, consumer: { prefetch } };
       const consumeTimestamps: number[] = [];
 
       await new Promise(async (resolve) => {
@@ -221,7 +216,7 @@ describe('Integration tests', () => {
       });
 
       // Average timestamp of each group of consumptions
-      const timestampMeans = _.chunk(consumeTimestamps, prefetch).map(_.mean);
+      const timestampMeans = chunk(consumeTimestamps, prefetch).map(timestamps => timestamps.reduce((a, b) => a + b, 0) / timestamps.length);
 
       for (let i = 1; i < timestampMeans.length; i++) {
         const diff = timestampMeans[i] - timestampMeans[i-1];

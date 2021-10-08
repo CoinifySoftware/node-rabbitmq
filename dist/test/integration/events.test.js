@@ -4,7 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const chai_1 = require("chai");
-const lodash_1 = __importDefault(require("lodash"));
+const lodash_chunk_1 = __importDefault(require("lodash.chunk"));
 const bootstrap_test_1 = require("../bootstrap.test");
 describe('Integration tests', () => {
     describe('Events', () => {
@@ -37,7 +37,7 @@ describe('Integration tests', () => {
         it('should be able to publish an event with a pre-defined UUID and timestamp', () => {
             const uuid = '12341234-1234-1234-1234-123412341234';
             const time = 1511944077916;
-            const emitOptions = lodash_1.default.defaults({ uuid, time }, emitEventOptions);
+            const emitOptions = { ...emitEventOptions, uuid, time };
             return new Promise(async (resolve) => {
                 await rabbit.registerEventConsumer(fullEventName, (c, e) => {
                     (0, chai_1.expect)(e.uuid).to.equal(uuid);
@@ -50,9 +50,7 @@ describe('Integration tests', () => {
         it('should be able to publish and consume multiple events with a single consumer', () => {
             const eventCount = 3;
             return new Promise(async (resolve) => {
-                const contexts = lodash_1.default.map(lodash_1.default.range(eventCount), i => {
-                    return { eventNumber: i };
-                });
+                const contexts = Array.from({ length: eventCount }, (_, eventNumber) => ({ eventNumber }));
                 let eventsConsumed = 0;
                 await rabbit.registerEventConsumer(fullEventName, (c, e) => {
                     (0, chai_1.expect)(e.eventName).to.equal(fullEventName);
@@ -70,13 +68,11 @@ describe('Integration tests', () => {
         it('should be able to publish a multiple events, load balanced to multiple consumers within the same service', () => {
             const consumerCount = 3;
             const eventCount = consumerCount * 3;
-            const consumerIds = lodash_1.default.range(consumerCount);
+            const consumerIds = Array.from({ length: consumerCount }, (_, i) => i);
             const eventsConsumed = [];
             const eventsConsumedByConsumer = {};
-            const eventIds = lodash_1.default.range(eventCount);
-            const contexts = lodash_1.default.map(eventIds, i => {
-                return { eventNumber: i };
-            });
+            const eventIds = Array.from({ length: eventCount }, (_, i) => i);
+            const contexts = eventIds.map(eventNumber => ({ eventNumber }));
             return new Promise(async (resolve) => {
                 for (const i of consumerIds) {
                     await rabbit.registerEventConsumer(fullEventName, (c, e) => {
@@ -84,7 +80,7 @@ describe('Integration tests', () => {
                         eventsConsumed.push(c.eventNumber);
                         eventsConsumedByConsumer[i] = (eventsConsumedByConsumer[i] || 0) + 1;
                         if (eventsConsumed.length === eventCount) {
-                            const eventsConsumedSorted = lodash_1.default.sortBy(eventsConsumed);
+                            const eventsConsumedSorted = eventsConsumed.sort();
                             (0, chai_1.expect)(eventsConsumedSorted).to.deep.equal(eventIds);
                             resolve(undefined);
                         }
@@ -98,16 +94,14 @@ describe('Integration tests', () => {
         it('should be able to publish multiple events, broadcast to multiple consumers from different services', () => {
             const consumerCount = 3;
             const eventCount = 3;
-            const consumerIds = lodash_1.default.range(consumerCount);
+            const consumerIds = Array.from({ length: consumerCount }, (_, i) => i);
             const eventsConsumed = [];
             const eventsConsumedByConsumer = {};
-            const eventIds = lodash_1.default.range(eventCount);
-            const contexts = lodash_1.default.map(eventIds, i => {
-                return { eventNumber: i };
-            });
+            const eventIds = Array.from({ length: eventCount }, (_, i) => i);
+            const contexts = eventIds.map(eventNumber => ({ eventNumber }));
             return new Promise(async (resolve) => {
                 for (const i of consumerIds) {
-                    const consumeOptions = lodash_1.default.defaultsDeep({}, registerEventConsumerOptions, { service: { name: 'service' + i } });
+                    const consumeOptions = { ...registerEventConsumerOptions, service: { name: 'service' + i } };
                     await rabbit.registerEventConsumer(fullEventName, (c, e) => {
                         (0, chai_1.expect)(e.eventName).to.equal(fullEventName);
                         eventsConsumed.push(c.eventNumber);
@@ -116,11 +110,11 @@ describe('Integration tests', () => {
                         }
                         eventsConsumedByConsumer[i].push(c.eventNumber);
                         if (eventsConsumed.length === eventCount * consumerCount) {
-                            (0, chai_1.expect)(lodash_1.default.size(eventsConsumedByConsumer)).to.equal(eventCount);
-                            lodash_1.default.forOwn(eventsConsumedByConsumer, (eventsConsumed) => {
-                                const eventsConsumedSorted = lodash_1.default.sortBy(eventsConsumed);
+                            (0, chai_1.expect)(Object.values(eventsConsumedByConsumer)).to.have.lengthOf(eventCount);
+                            for (const consumerId in eventsConsumedByConsumer) {
+                                const eventsConsumedSorted = [...eventsConsumedByConsumer[consumerId]].sort();
                                 (0, chai_1.expect)(eventsConsumedSorted).to.deep.equal(eventIds);
-                            });
+                            }
                             resolve(undefined);
                         }
                     }, consumeOptions);
@@ -132,12 +126,12 @@ describe('Integration tests', () => {
         });
         it('should be able to consume the same event in all instances of the same service', () => {
             const consumerCount = 3;
-            const consumerIds = lodash_1.default.range(consumerCount);
+            const consumerIds = Array.from({ length: consumerCount }, (_, i) => i);
             let eventsConsumed = 0;
             const eventsConsumedByConsumer = {};
             return new Promise(async (resolve) => {
                 for (const i of consumerIds) {
-                    const consumeOptions = lodash_1.default.defaultsDeep({}, registerEventConsumerOptions, { service: { name: 'my-service' }, uniqueQueue: true });
+                    const consumeOptions = { ...registerEventConsumerOptions, service: { name: 'my-service' }, uniqueQueue: true };
                     await rabbit.registerEventConsumer(fullEventName, (c, e) => {
                         (0, chai_1.expect)(e.eventName).to.equal(fullEventName);
                         eventsConsumed++;
@@ -146,10 +140,8 @@ describe('Integration tests', () => {
                         }
                         eventsConsumedByConsumer[i]++;
                         if (eventsConsumed === consumerCount) {
-                            (0, chai_1.expect)(lodash_1.default.size(eventsConsumedByConsumer)).to.equal(consumerCount);
-                            lodash_1.default.forOwn(eventsConsumedByConsumer, eventsConsumed => {
-                                (0, chai_1.expect)(eventsConsumed).to.equal(1);
-                            });
+                            (0, chai_1.expect)(Object.values(eventsConsumedByConsumer)).to.have.lengthOf(consumerCount);
+                            (0, chai_1.expect)(Object.values(eventsConsumedByConsumer).every(eventsConsumed => eventsConsumed === 1)).to.equal(true);
                             resolve(undefined);
                         }
                     }, consumeOptions);
@@ -171,12 +163,12 @@ describe('Integration tests', () => {
             const context3 = { eventNumber: 3 };
             const context4 = { eventNumber: 4 };
             const eventsConsumedByConsumer = { 1: [], 2: [], 3: [], 4: [] };
-            const emitEventOptionsWithoutServiceName = lodash_1.default.defaultsDeep({ service: { name: false } }, emitEventOptions);
+            const emitEventOptionsWithoutServiceName = { ...emitEventOptions, service: { name: '' } };
             await new Promise(async (resolve) => {
                 for (const [i, consumeKey] of [[1, consumeKey1], [2, consumeKey2], [3, consumeKey3], [4, consumeKey4]]) {
                     await rabbit.registerEventConsumer(consumeKey, (context, event) => {
                         eventsConsumedByConsumer[i].push({ context, event });
-                        const totalEventsConsumed = lodash_1.default.flatten(lodash_1.default.values(eventsConsumedByConsumer)).length;
+                        const totalEventsConsumed = Object.values(eventsConsumedByConsumer).flat().length;
                         if (totalEventsConsumed === 10) {
                             resolve(undefined);
                         }
@@ -187,15 +179,15 @@ describe('Integration tests', () => {
                 await rabbit.emitEvent(event3, context3, emitEventOptionsWithoutServiceName);
                 await rabbit.emitEvent(event4, context4, emitEventOptionsWithoutServiceName);
             });
-            let { 1: consumed1, 2: consumed2, 3: consumed3, 4: consumed4 } = eventsConsumedByConsumer;
+            const { 1: consumed1, 2: consumed2, 3: consumed3, 4: consumed4 } = eventsConsumedByConsumer;
             (0, chai_1.expect)(consumed1).to.have.lengthOf(1);
             (0, chai_1.expect)(consumed2).to.have.lengthOf(2);
             (0, chai_1.expect)(consumed3).to.have.lengthOf(3);
             (0, chai_1.expect)(consumed4).to.have.lengthOf(4);
-            consumed1 = lodash_1.default.sortBy(consumed1, 'context.eventNumber');
-            consumed2 = lodash_1.default.sortBy(consumed2, 'context.eventNumber');
-            consumed3 = lodash_1.default.sortBy(consumed3, 'context.eventNumber');
-            consumed4 = lodash_1.default.sortBy(consumed4, 'context.eventNumber');
+            consumed1.sort((a, b) => a.context.eventNumber - b.context.eventNumber);
+            consumed2.sort((a, b) => a.context.eventNumber - b.context.eventNumber);
+            consumed3.sort((a, b) => a.context.eventNumber - b.context.eventNumber);
+            consumed4.sort((a, b) => a.context.eventNumber - b.context.eventNumber);
             (0, chai_1.expect)(consumed1[0]).to.containSubset({ event: { eventName: event1 }, context: context1 });
             (0, chai_1.expect)(consumed2[0]).to.containSubset({ event: { eventName: event1 }, context: context1 });
             (0, chai_1.expect)(consumed2[1]).to.containSubset({ event: { eventName: event2 }, context: context2 });
@@ -214,17 +206,18 @@ describe('Integration tests', () => {
             const delayMillis = 250;
             await new Promise(async (resolve) => {
                 for (const i of [1, 2, 3, 4]) {
-                    const consumeOptions = lodash_1.default.defaultsDeep({
+                    const consumeOptions = {
+                        ...registerEventConsumerOptions,
                         retry: { backoff: { type: 'fixed', delay: delayMillis / 1000 }, maxAttempts },
                         service: { name: 'service' + i }
-                    }, registerEventConsumerOptions);
+                    };
                     await rabbit.registerEventConsumer(fullEventName, (context, event) => {
                         (0, chai_1.expect)(event.eventName).to.equal(fullEventName);
                         eventConsumptionsByConsumer[i]++;
                         if (i === 1 && eventConsumptionsByConsumer[i] <= maxAttempts) {
                             throw new Error('Failing for the first consumer');
                         }
-                        if (lodash_1.default.isEqual(eventConsumptionsByConsumer, expectedEventConsumptionsByConsumer)) {
+                        if (JSON.stringify(eventConsumptionsByConsumer) === JSON.stringify(expectedEventConsumptionsByConsumer)) {
                             resolve(undefined);
                         }
                     }, consumeOptions);
@@ -237,7 +230,7 @@ describe('Integration tests', () => {
             const prefetch = 3;
             const taskCount = 3 * prefetch;
             const consumeTime = 250;
-            const consumerOptions = lodash_1.default.defaultsDeep({ consumer: { prefetch } }, registerEventConsumerOptions);
+            const consumerOptions = { ...registerEventConsumerOptions, consumer: { prefetch } };
             const consumeTimestamps = [];
             await new Promise(async (resolve) => {
                 await rabbit.registerEventConsumer(fullEventName, async () => {
@@ -249,7 +242,7 @@ describe('Integration tests', () => {
                 }, consumerOptions);
                 await Promise.all(new Array(taskCount).fill(undefined).map(() => rabbit.emitEvent(eventName, context, emitEventOptions)));
             });
-            const timestampMeans = lodash_1.default.chunk(consumeTimestamps, prefetch).map(lodash_1.default.mean);
+            const timestampMeans = (0, lodash_chunk_1.default)(consumeTimestamps, prefetch).map(timestamps => timestamps.reduce((a, b) => a + b, 0) / timestamps.length);
             for (let i = 1; i < timestampMeans.length; i++) {
                 const diff = timestampMeans[i] - timestampMeans[i - 1];
                 (0, chai_1.expect)(diff).to.be.at.least(consumeTime - 100).and.at.most(consumeTime + 100);

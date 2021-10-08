@@ -4,7 +4,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const chai_1 = require("chai");
-const lodash_1 = __importDefault(require("lodash"));
 const sinon_1 = __importDefault(require("sinon"));
 const CoinifyRabbit_1 = __importDefault(require("../../../src/CoinifyRabbit"));
 describe('CoinifyRabbit', () => {
@@ -33,13 +32,13 @@ describe('CoinifyRabbit', () => {
             (0, chai_1.expect)(registerEventConsumerStub.callCount).to.equal(3);
             let i = 0;
             for (const { key, consumerTag, consumeFn, options } of [eventConsumer1, eventConsumer2, eventConsumer3]) {
-                (0, chai_1.expect)(registerEventConsumerStub.getCall(i).args).to.deep.equal([key, consumeFn, lodash_1.default.set(options, 'consumerTag', consumerTag)]);
+                (0, chai_1.expect)(registerEventConsumerStub.getCall(i).args).to.deep.equal([key, consumeFn, { ...options, consumerTag }]);
                 i++;
             }
             (0, chai_1.expect)(registerTaskConsumerStub.callCount).to.equal(2);
             i = 0;
             for (const { key, consumerTag, consumeFn, options } of [taskConsumer1, taskConsumer2]) {
-                (0, chai_1.expect)(registerTaskConsumerStub.getCall(i).args).to.deep.equal([key, consumeFn, lodash_1.default.set(options, 'consumerTag', consumerTag)]);
+                (0, chai_1.expect)(registerTaskConsumerStub.getCall(i).args).to.deep.equal([key, consumeFn, { ...options, consumerTag }]);
                 i++;
             }
         });

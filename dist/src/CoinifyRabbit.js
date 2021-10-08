@@ -22,7 +22,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const lodash_1 = __importDefault(require("lodash"));
+const lodash_clonedeep_1 = __importDefault(require("lodash.clonedeep"));
+const lodash_defaultsdeep_1 = __importDefault(require("lodash.defaultsdeep"));
+const lodash_truncate_1 = __importDefault(require("lodash.truncate"));
 const amqplib = __importStar(require("amqplib"));
 const backoff_1 = __importDefault(require("backoff"));
 const console_log_level_1 = __importDefault(require("console-log-level"));
@@ -37,7 +39,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
         this.activeMessageConsumptions = [];
         this.isShuttingDown = false;
         const { logger, ...config } = options !== null && options !== void 0 ? options : {};
-        this.config = lodash_1.default.defaultsDeep({}, config, CoinifyRabbitConfiguration_1.DEFAULT_CONFIGURATION);
+        this.config = (0, lodash_defaultsdeep_1.default)({}, config, CoinifyRabbitConfiguration_1.DEFAULT_CONFIGURATION);
         this.logger = logger !== null && logger !== void 0 ? logger : (0, console_log_level_1.default)({ level: this.config.defaultLogLevel });
         if (!this.config.service.name) {
             throw new Error('options.service.name must be set');
@@ -90,31 +92,31 @@ class CoinifyRabbit extends events_1.EventEmitter {
         return consumerTag;
     }
     async enqueueTask(fullTaskName, context, options) {
-        var _a, _b, _c;
+        var _a, _b, _c, _d;
         const serviceName = (_b = (_a = options === null || options === void 0 ? void 0 : options.service) === null || _a === void 0 ? void 0 : _a.name) !== null && _b !== void 0 ? _b : this.config.service.name;
         const channel = await this._getChannel();
-        const delayMillis = lodash_1.default.get(options, 'delayMillis', 0);
+        const delayMillis = (_c = options === null || options === void 0 ? void 0 : options.delayMillis) !== null && _c !== void 0 ? _c : 0;
         let exchangeName;
         const publishOptions = {};
         if (delayMillis > 0) {
-            const delayedAmqpOptions = lodash_1.default.pick(options, ['exchange', 'queue']);
+            const delayedAmqpOptions = { exchange: options === null || options === void 0 ? void 0 : options.exchange };
             const { delayedExchangeName, delayedQueueName } = await this._assertDelayedTaskExchangeAndQueue(delayMillis, delayedAmqpOptions);
             exchangeName = delayedExchangeName;
             publishOptions.BCC = delayedQueueName;
         }
         else {
-            exchangeName = lodash_1.default.get(this.config, 'exchanges.tasksTopic');
-            await channel.assertExchange(exchangeName, 'topic', lodash_1.default.get(options, 'exchange', {}));
+            exchangeName = this.config.exchanges.tasksTopic;
+            await channel.assertExchange(exchangeName, 'topic', options === null || options === void 0 ? void 0 : options.exchange);
         }
         this.logger.trace({ fullTaskName, context, exchangeName, options, publishOptions }, 'enqueueTask()');
         const task = {
             taskName: fullTaskName,
             context,
-            uuid: (_c = options === null || options === void 0 ? void 0 : options.uuid) !== null && _c !== void 0 ? _c : (0, uuid_1.v4)(),
+            uuid: (_d = options === null || options === void 0 ? void 0 : options.uuid) !== null && _d !== void 0 ? _d : (0, uuid_1.v4)(),
             time: (options === null || options === void 0 ? void 0 : options.time) ? new Date(options.time).getTime() : Date.now(),
             attempts: 0,
             origin: serviceName,
-            delayMillis: delayMillis > 0 && delayMillis
+            delayMillis: delayMillis > 0 ? delayMillis : undefined
         };
         const message = Buffer.from(JSON.stringify(task));
         const publishResult = channel.publish(exchangeName, fullTaskName, message, publishOptions);
@@ -204,9 +206,9 @@ class CoinifyRabbit extends events_1.EventEmitter {
             if (!this._getConnectionPromise) {
                 this._getConnectionPromise = (async () => {
                     try {
-                        const connectionConfig = lodash_1.default.get(this.config, 'connection');
-                        this.logger.info({ connectionConfig: lodash_1.default.omit(connectionConfig, ['password']) }, 'Opening connection to RabbitMQ');
-                        this._conn = await amqplib.connect(CoinifyRabbit._generateConnectionUrl(connectionConfig), { clientProperties: { connection_name: lodash_1.default.get(this.config, 'service.name') } });
+                        const connectionConfig = this.config.connection;
+                        this.logger.info({ connectionConfig: { ...connectionConfig, password: undefined } }, 'Opening connection to RabbitMQ');
+                        this._conn = await amqplib.connect(CoinifyRabbit._generateConnectionUrl(connectionConfig), { clientProperties: { connection_name: this.config.service.name } });
                         this._conn.on('error', err => {
                             this.logger.warn({ err }, 'RabbitMQ connection error');
                             delete this._conn;
@@ -233,7 +235,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
         return this._conn;
     }
     static _generateConnectionUrl(connectionConfig) {
-        if (!lodash_1.default.includes(['amqp', 'amqps'], connectionConfig.protocol)) {
+        if (!['amqp', 'amqps'].includes(connectionConfig.protocol)) {
             throw new Error(`Invalid protocol '${connectionConfig.protocol}'. Must be 'amqp' or 'amqps'`);
         }
         let url = `${connectionConfig.protocol}://`;
@@ -255,12 +257,12 @@ class CoinifyRabbit extends events_1.EventEmitter {
     }
     async _onChannelOpened(channel) {
         this.logger.info({}, 'Channel opened');
-        const prefetch = lodash_1.default.get(this.config, 'channel.prefetch');
+        const prefetch = this.config.channel.prefetch;
         await channel.prefetch(prefetch, true);
         await this._recreateRegisteredConsumers();
     }
     async _recreateRegisteredConsumers() {
-        const consumers = lodash_1.default.cloneDeep(this.consumers);
+        const consumers = (0, lodash_clonedeep_1.default)(this.consumers);
         this.consumers = [];
         for (const consumer of consumers) {
             switch (consumer.type) {
@@ -315,21 +317,21 @@ class CoinifyRabbit extends events_1.EventEmitter {
             return;
         }
         this.isShuttingDown = true;
-        const activeTaskConsumptions = this.activeMessageConsumptions.filter(c => 'taskName' in c);
-        const activeEventConsumptions = this.activeMessageConsumptions.filter(c => 'eventName' in c);
+        const activeTaskConsumptions = this.activeMessageConsumptions.filter((m) => 'taskName' in m);
+        const activeEventConsumptions = this.activeMessageConsumptions.filter((m) => 'eventName' in m);
         this.logger.info({
-            registeredConsumers: JSON.stringify(this.consumers.map(c => lodash_1.default.pick(c, ['type', 'key', 'consumerTag']))),
+            registeredConsumers: JSON.stringify(this.consumers.map(({ type, key, consumerTag }) => ({ type, key, consumerTag }))),
             activeConsumption: {
-                tasks: JSON.stringify(activeTaskConsumptions.map(c => lodash_1.default.pick(c, ['uuid', 'taskName']))),
-                events: JSON.stringify(activeEventConsumptions.map(c => lodash_1.default.pick(c, ['uuid', 'eventName'])))
+                tasks: JSON.stringify(activeTaskConsumptions.map(({ uuid, taskName }) => ({ uuid, taskName }))),
+                events: JSON.stringify(activeEventConsumptions.map(({ uuid, eventName }) => ({ uuid, eventName })))
             },
             timeout
         }, 'Shutting down RabbitMQ');
-        if (lodash_1.default.size(this.consumers)) {
+        if (this.consumers.length > 0) {
             await this._cancelAllConsumers();
             await this._waitForConsumersToFinish(timeout);
         }
-        if (lodash_1.default.size(this.activeMessageConsumptions)) {
+        if (this.activeMessageConsumptions.length > 0) {
             const channel = await this._getChannel();
             channel.nackAll();
         }
@@ -351,17 +353,23 @@ class CoinifyRabbit extends events_1.EventEmitter {
         this.consumers = [];
     }
     _waitForConsumersToFinish(timeout) {
-        if (lodash_1.default.size(this.activeMessageConsumptions) === 0) {
+        if (this.activeMessageConsumptions.length === 0) {
             return;
         }
         return new Promise(resolve => {
-            const resolveOnce = lodash_1.default.once(resolve);
+            let resolved = false;
+            const resolveOnce = (arg) => {
+                if (!resolved) {
+                    resolved = true;
+                    resolve(arg);
+                }
+            };
             this.on('messageConsumed', () => {
-                if (lodash_1.default.size(this.activeMessageConsumptions) === 0) {
+                if (this.activeMessageConsumptions.length === 0) {
                     resolveOnce(undefined);
                 }
             });
-            if (timeout && lodash_1.default.isInteger(timeout) && timeout > 0) {
+            if (timeout && Number.isInteger(timeout) && timeout > 0) {
                 setTimeout(resolveOnce, timeout);
             }
         });
@@ -401,15 +409,15 @@ class CoinifyRabbit extends events_1.EventEmitter {
         let consumeError = null;
         try {
             const startTime = Date.now();
-            const consumeResult = await consumeFn(lodash_1.default.cloneDeep(context), lodash_1.default.cloneDeep(msgObj));
+            const consumeResult = await consumeFn((0, lodash_clonedeep_1.default)(context), (0, lodash_clonedeep_1.default)(msgObj));
             const consumeTimeMillis = Date.now() - startTime;
-            const consumeResultTruncated = lodash_1.default.truncate(JSON.stringify(consumeResult), { length: 4096 });
+            const consumeResultTruncated = (0, lodash_truncate_1.default)(JSON.stringify(consumeResult), { length: 4096 });
             this.logger.info({ [messageType]: msgObj, consumeResult: consumeResultTruncated, consumeTimeMillis }, `${messageType} ${name} consumed`);
         }
         catch (err) {
             consumeError = err;
         }
-        lodash_1.default.pull(this.activeMessageConsumptions, msgObj);
+        this.activeMessageConsumptions = this.activeMessageConsumptions.filter(msg => msg !== msgObj);
         this.emit('messageConsumed', msgObj);
         try {
             channel.ack(message);
@@ -428,7 +436,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
         if (!allowedTypes.includes(messageType)) {
             throw new Error(`Invalid type. Given: ${messageType}, allowed: [${allowedTypes.join(', ')}]`);
         }
-        const retryResponse = CoinifyRabbit._decideConsumerRetry(messageObject.attempts, lodash_1.default.get(options, 'retry'));
+        const retryResponse = CoinifyRabbit._decideConsumerRetry(messageObject.attempts, options.retry);
         let { shouldRetry } = retryResponse;
         const { delaySeconds } = retryResponse;
         if (consumeError && consumeError.noRetry === true) {
@@ -460,7 +468,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
             err.cause = consumeError;
             this.logger.error({ err, [messageType]: messageObject }, `${messageType} error handling function rejected!`);
         }
-        const retryAmqpOptions = lodash_1.default.pick(options, ['exchange', 'queue']);
+        const retryAmqpOptions = { exchange: options.exchange, queue: options.queue };
         const publishOptions = {};
         let republishExchangeName;
         if (shouldRetry) {
@@ -471,7 +479,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
         else {
             republishExchangeName = await this._assertDeadLetterExchangeAndQueue(retryAmqpOptions);
         }
-        messageObject = lodash_1.default.cloneDeep(messageObject);
+        messageObject = (0, lodash_clonedeep_1.default)(messageObject);
         messageObject.attempts = (messageObject.attempts || 0) + 1;
         const updatedMessage = Buffer.from(JSON.stringify(messageObject));
         const channel = await this._getChannel();
@@ -480,7 +488,9 @@ class CoinifyRabbit extends events_1.EventEmitter {
         if (!publishResult) {
             const err = new Error(`channel.publish() to exchange '${republishExchangeName}' with routing key '${routingKey}'`
                 + ` resolved to ${JSON.stringify(publishResult)}`);
-            lodash_1.default.assign(err, { republishExchangeName, routingKey, updatedMessage });
+            err.republishExchangeName = republishExchangeName;
+            err.routingKey = routingKey;
+            err.updatedMessage = updatedMessage;
             throw err;
         }
         const logContext = { [messageType]: messageObject, routingKey, shouldRetry, delaySeconds, publishOptions };
@@ -504,9 +514,9 @@ class CoinifyRabbit extends events_1.EventEmitter {
         this.activeMessageConsumptions.push(msgObj);
         try {
             const startTime = Date.now();
-            const consumeResult = await consumeFn(lodash_1.default.cloneDeep(message.fields.routingKey), lodash_1.default.cloneDeep(msgObj));
+            const consumeResult = await consumeFn((0, lodash_clonedeep_1.default)(message.fields.routingKey), (0, lodash_clonedeep_1.default)(msgObj));
             const consumeTimeMillis = Date.now() - startTime;
-            const consumeResultTruncated = lodash_1.default.truncate(JSON.stringify(consumeResult), { length: 4096 });
+            const consumeResultTruncated = (0, lodash_truncate_1.default)(JSON.stringify(consumeResult), { length: 4096 });
             channel.ack(message);
             this.logger.info({ message: msgObj, consumeResult: consumeResultTruncated, consumeTimeMillis }, 'message consumed');
         }
@@ -514,7 +524,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
             this.logger.warn({ err, message: msgObj }, 'Error consuming message from failed queue');
             channel.nack(message);
         }
-        lodash_1.default.pull(this.activeMessageConsumptions, msgObj);
+        this.activeMessageConsumptions = this.activeMessageConsumptions.filter(msg => msg !== msgObj);
         this.emit('messageConsumed', msgObj);
     }
     async enqueueMessage(queueName, messageObject, options) {
@@ -531,11 +541,11 @@ class CoinifyRabbit extends events_1.EventEmitter {
     async _assertRetryExchangeAndQueue(delaySeconds, options) {
         const channel = await this._getChannel();
         const delayMs = Math.round(delaySeconds * 1000);
-        const retryExchangeName = lodash_1.default.get(this.config, 'exchanges.retry');
-        const retryQueueName = lodash_1.default.get(this.config, 'queues.retryPrefix') + '.' + delayMs + 'ms';
-        const exchangeOptions = lodash_1.default.defaultsDeep({}, lodash_1.default.get(options, 'exchange', {}), { autoDelete: true });
+        const retryExchangeName = this.config.exchanges.retry;
+        const retryQueueName = this.config.queues.retryPrefix + '.' + delayMs + 'ms';
+        const exchangeOptions = (0, lodash_defaultsdeep_1.default)({}, options === null || options === void 0 ? void 0 : options.exchange, { autoDelete: true });
         await channel.assertExchange(retryExchangeName, 'direct', exchangeOptions);
-        const queueOptions = lodash_1.default.defaultsDeep({}, lodash_1.default.get(options, 'queue', {}), {
+        const queueOptions = (0, lodash_defaultsdeep_1.default)({}, options === null || options === void 0 ? void 0 : options.queue, {
             deadLetterExchange: '',
             messageTtl: delayMs
         });
@@ -571,34 +581,33 @@ class CoinifyRabbit extends events_1.EventEmitter {
         return deadLetterExchangeName;
     }
     static _decideConsumerRetry(currentAttempt, options) {
+        var _a, _b, _c, _d, _e, _f, _g;
         let delaySeconds = 0;
         if (!options) {
             return { shouldRetry: false, delaySeconds };
         }
-        options = options || {};
-        const maxAttempts = lodash_1.default.get(options, 'maxAttempts', 12);
-        if (!lodash_1.default.isInteger(maxAttempts) || maxAttempts < -1) {
+        const maxAttempts = (_a = options.maxAttempts) !== null && _a !== void 0 ? _a : 12;
+        if (!Number.isInteger(maxAttempts) || maxAttempts < -1) {
             throw new Error('Retry maxAttempts must be -1, 0, or a positive integer');
         }
         if (maxAttempts !== -1 && currentAttempt >= maxAttempts) {
             return { shouldRetry: false, delaySeconds };
         }
-        delaySeconds = lodash_1.default.get(options, 'backoff.delay', 16);
-        if (!lodash_1.default.isNumber(delaySeconds) || delaySeconds < 0) {
+        delaySeconds = (_c = (_b = options.backoff) === null || _b === void 0 ? void 0 : _b.delay) !== null && _c !== void 0 ? _c : 16;
+        if (!Number.isFinite(delaySeconds) || delaySeconds < 0) {
             throw new Error('Retry: backoff.delay must be a strictly positive number');
         }
-        const backoffType = lodash_1.default.get(options, 'backoff.type', 'fixed');
-        switch (backoffType) {
+        switch ((_d = options.backoff) === null || _d === void 0 ? void 0 : _d.type) {
             case 'exponential': {
-                const eBase = lodash_1.default.get(options, 'backoff.base', 2);
+                const eBase = (_f = (_e = options.backoff) === null || _e === void 0 ? void 0 : _e.base) !== null && _f !== void 0 ? _f : 2;
                 delaySeconds = delaySeconds * eBase ** currentAttempt;
                 break;
             }
-            case 'fixed': {
+            case undefined:
+            case 'fixed':
                 break;
-            }
             default:
-                throw new Error(`Retry: invalid backoff.type: '${backoffType}'`);
+                throw new Error(`Retry: invalid backoff.type: '${(_g = options.backoff) === null || _g === void 0 ? void 0 : _g.type}'`);
         }
         return { shouldRetry: true, delaySeconds };
     }

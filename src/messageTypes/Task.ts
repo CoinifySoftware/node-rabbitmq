@@ -1,6 +1,6 @@
 import * as amqplib from 'amqplib';
 import { ServiceConfiguration } from '../CoinifyRabbitConfiguration';
-import { RetryConfiguration } from '../types';
+import { EnqueueMessageOptions, RetryConfiguration } from '../types';
 
 export default interface Task<Context = any> {
   taskName: string;
@@ -42,4 +42,8 @@ export interface RegisterTaskConsumerOptions {
   };
   retry?: RetryConfiguration;
   service?: ServiceConfiguration;
+}
+
+export interface EnqueueTaskOptions extends EnqueueMessageOptions {
+  delayMillis?: number;
 }

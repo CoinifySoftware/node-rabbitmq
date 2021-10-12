@@ -170,7 +170,7 @@ describe('Integration tests', () => {
 
       // disable autoDelete for queue, as we need to enqueue a task which should persist until the otherRabbit
       // consumer is ready. Delete the queue automatically after 1 second of incativity.
-      const myConsumeOptions = _.defaultsDeep({ queue: { expires: 1000, autoDelete: false } }, consumeOptions);
+      const myConsumeOptions = { ...consumeOptions, queue: { expires: 1000, autoDelete: false } };
 
       await rabbit.registerTaskConsumer(taskName, () => {
         consumeCount++;

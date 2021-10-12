@@ -6,7 +6,7 @@ import Logger from './interfaces/Logger';
 import DeepPartial from './DeepPartial';
 import { EnqueueMessageOptions, RetryConfiguration } from './types';
 import Event, { EventConsumerFunction, RegisterEventConsumerOptions } from './messageTypes/Event';
-import Task, { RegisterTaskConsumerOptions, TaskConsumerFunction } from './messageTypes/Task';
+import Task, { EnqueueTaskOptions, RegisterTaskConsumerOptions, TaskConsumerFunction } from './messageTypes/Task';
 import { FailedMessageConsumerFunction, RegisterFailedMessageConsumerOptions } from './messageTypes/FailedMessage';
 export interface CoinifyRabbitConstructorOptions extends DeepPartial<CoinifyRabbitConfiguration> {
     logger?: Logger;
@@ -20,7 +20,7 @@ export default class CoinifyRabbit extends EventEmitter {
     constructor(options?: CoinifyRabbitConstructorOptions);
     emitEvent(eventName: string, context: unknown, options?: EnqueueMessageOptions): Promise<Event>;
     registerEventConsumer<Context = any>(eventKey: string, consumeFn: EventConsumerFunction<Context>, options?: RegisterEventConsumerOptions): Promise<string>;
-    enqueueTask(fullTaskName: string, context: unknown, options?: EnqueueMessageOptions): Promise<Task<any>>;
+    enqueueTask(fullTaskName: string, context: unknown, options?: EnqueueTaskOptions): Promise<Task<any>>;
     registerTaskConsumer<Context = any>(taskName: string, consumeFn: TaskConsumerFunction<Context>, options?: RegisterTaskConsumerOptions): Promise<string>;
     registerFailedMessageConsumer(consumeFn: FailedMessageConsumerFunction, options?: RegisterFailedMessageConsumerOptions): Promise<string>;
     assertConnection(): Promise<void>;

@@ -74,7 +74,7 @@ describe('CoinifyRabbit', () => {
       expect(_decideConsumerRetryStub.firstCall.args).to.deep.equal([ task.attempts, options.retry ]);
 
       expect(_assertRetryExchangeAndQueueStub.calledOnce).to.equal(true);
-      expect(_assertRetryExchangeAndQueueStub.firstCall.args).to.deep.equal([ delaySeconds, _.pick(options, [ 'exchange', 'queue' ]) ]);
+      expect(_assertRetryExchangeAndQueueStub.firstCall.args).to.deep.equal([ delaySeconds, { exchange: options.exchange, queue: options.queue } ]);
 
       expect(_assertDeadLetterExchangeAndQueueStub.notCalled).to.equal(true);
 
@@ -85,7 +85,7 @@ describe('CoinifyRabbit', () => {
       expect(channelPublishStub.firstCall.args[2]).to.be.instanceof(Buffer);
       expect(channelPublishStub.firstCall.args[3]).to.deep.equal({ BCC: retryQueueName });
       const messageDecoded = JSON.parse(channelPublishStub.firstCall.args[2].toString());
-      expect(messageDecoded).to.deep.equal(_.set(task, 'attempts', task.attempts+1));
+      expect(messageDecoded).to.deep.equal({ ...task, attempts: task.attempts + 1 });
     });
 
     it('should re-publish to dead letter queue if _decideConsumerRetry() returns shouldRetry: false', async () => {
@@ -97,7 +97,7 @@ describe('CoinifyRabbit', () => {
       expect(_assertRetryExchangeAndQueueStub.notCalled).to.equal(true);
 
       expect(_assertDeadLetterExchangeAndQueueStub.calledOnce).to.equal(true);
-      expect(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([ _.pick(options, [ 'exchange', 'queue' ]) ]);
+      expect(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([ { exchange: options.exchange, queue: options.queue } ]);
 
       expect(channelPublishStub.calledOnce).to.equal(true);
       expect(channelPublishStub.firstCall.args).to.have.lengthOf(4);
@@ -106,7 +106,7 @@ describe('CoinifyRabbit', () => {
       expect(channelPublishStub.firstCall.args[2]).to.be.instanceof(Buffer);
       expect(channelPublishStub.firstCall.args[3]).to.deep.equal({});
       const messageDecoded = JSON.parse(channelPublishStub.firstCall.args[2].toString());
-      expect(messageDecoded).to.deep.equal(_.set(task, 'attempts', task.attempts+1));
+      expect(messageDecoded).to.deep.equal({ ...task, attempts: task.attempts + 1 });
     });
 
     it('should re-publish to dead letter queue if consumeError contains noRetry: true property', async () => {
@@ -122,7 +122,7 @@ describe('CoinifyRabbit', () => {
       expect(_assertRetryExchangeAndQueueStub.notCalled).to.equal(true);
 
       expect(_assertDeadLetterExchangeAndQueueStub.calledOnce).to.equal(true);
-      expect(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([ _.pick(options, [ 'exchange', 'queue' ]) ]);
+      expect(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([ { exchange: options.exchange, queue: options.queue } ]);
 
       expect(channelPublishStub.calledOnce).to.equal(true);
       expect(channelPublishStub.firstCall.args).to.have.lengthOf(4);

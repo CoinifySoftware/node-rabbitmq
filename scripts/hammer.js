@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 const cli = require('cli'),
-  _ = require('lodash'),
   consoleLogLevel = require('console-log-level');
 
 const CoinifyRabbit = require('../index');
@@ -16,7 +15,7 @@ async function run() {
 
   const { type, number, name, contextString } = options;
 
-  if (!type || !_.includes([ 'task', 'event' ], type)) {
+  if (!type || ![ 'task', 'event' ].includes(type)) {
     cli.fatal(`Please specify either 'task' or 'event' as Message type (got '${type}')`);
   }
 
@@ -35,7 +34,7 @@ async function run() {
     cli.fatal(`Please input a vaild JSON-encoded string as context (got: '${contextString}'`);
   }
 
-  if (!_.isObject(context)) {
+  if (!Object.isObject(context)) {
     cli.fatal('Please input an object as context');
   }
 

@@ -43,14 +43,14 @@ describe('CoinifyRabbit', () => {
       expect(registerEventConsumerStub.callCount).to.equal(3);
       let i = 0;
       for (const { key, consumerTag, consumeFn, options } of [ eventConsumer1, eventConsumer2, eventConsumer3 ]) {
-        expect(registerEventConsumerStub.getCall(i).args).to.deep.equal([ key, consumeFn, _.set(options, 'consumerTag', consumerTag) ]);
+        expect(registerEventConsumerStub.getCall(i).args).to.deep.equal([ key, consumeFn, { ...options, consumerTag } ]);
         i++;
       }
 
       expect(registerTaskConsumerStub.callCount).to.equal(2);
       i = 0;
       for (const { key, consumerTag, consumeFn, options } of [ taskConsumer1, taskConsumer2 ]) {
-        expect(registerTaskConsumerStub.getCall(i).args).to.deep.equal([ key, consumeFn, _.set(options, 'consumerTag', consumerTag) ]);
+        expect(registerTaskConsumerStub.getCall(i).args).to.deep.equal([ key, consumeFn, { ...options, consumerTag } ]);
         i++;
       }
     });

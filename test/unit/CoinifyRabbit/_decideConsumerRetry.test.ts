@@ -76,7 +76,7 @@ describe('CoinifyRabbit', () => {
       /*
        * Default delay (16 seconds)
        */
-      const specificDelayOptions = _.defaultsDeep({ maxAttempts: -1 }, fixedOptions);
+      const specificDelayOptions = { ...fixedOptions, maxAttempts: -1 };
       let attempt = 0;
       do {
         const { shouldRetry, delaySeconds } = CoinifyRabbit._decideConsumerRetry(attempt, specificDelayOptions);
@@ -92,7 +92,7 @@ describe('CoinifyRabbit', () => {
       /*
        * Specific delay (180 seconds)
        */
-      const specificDelayOptions = _.defaultsDeep({ backoff: { delay: 180 } }, fixedOptions);
+      const specificDelayOptions = { ...fixedOptions, backoff: { delay: 180 } };
       let attempt = 0;
       do {
         const { shouldRetry, delaySeconds } = CoinifyRabbit._decideConsumerRetry(attempt, specificDelayOptions);
@@ -132,7 +132,7 @@ describe('CoinifyRabbit', () => {
       /*
        * Specific Delay is 7 seconds, default base is 7, maxAttempts is 7
        */
-      const specificOptions = _.defaultsDeep({ backoff: { delay: 7, base: 7 }, maxAttempts: 7 }, exponentialOptions);
+      const specificOptions: RetryConfiguration = { backoff: { type: 'exponential', delay: 7, base: 7 }, maxAttempts: 7 };
       const expectedDelays = [ 7, 49, 343, 2401, 16807, 117649, 823543 ];
       let attempt = 0;
       do {

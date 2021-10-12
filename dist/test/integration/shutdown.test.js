@@ -1,10 +1,6 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const chai_1 = require("chai");
-const lodash_1 = __importDefault(require("lodash"));
 const bootstrap_test_1 = require("../bootstrap.test");
 describe('Integration tests', () => {
     describe('Graceful shutdown', () => {
@@ -103,7 +99,7 @@ describe('Integration tests', () => {
         });
         it('should not consume anything after shutdown() has returned', async () => {
             let consumeCount = 0;
-            const myConsumeOptions = lodash_1.default.defaultsDeep({ queue: { expires: 1000, autoDelete: false } }, consumeOptions);
+            const myConsumeOptions = { ...consumeOptions, queue: { expires: 1000, autoDelete: false } };
             await rabbit.registerTaskConsumer(taskName, () => {
                 consumeCount++;
             }, myConsumeOptions);

@@ -1,7 +1,7 @@
-import Event from '../../src/messageTypes/Event';
 import { expect } from 'chai';
-import _ from 'lodash';
+import chunk from 'lodash.chunk';
 import CoinifyRabbit from '../../src/CoinifyRabbit';
+import Event, { RegisterEventConsumerOptions } from '../../src/messageTypes/Event';
 import { createRabbitMQTestInstance, disableFailedMessageQueue, reenableFailedMessageQueue } from '../bootstrap.test';
 
 interface EventContextWithEventNumber {
@@ -49,7 +49,7 @@ describe('Integration tests', () => {
       const uuid = '12341234-1234-1234-1234-123412341234';
       const time = 1511944077916;
 
-      const emitOptions = _.defaults({ uuid, time }, emitEventOptions);
+      const emitOptions = { ...emitEventOptions, uuid, time };
 
       return new Promise(async (resolve) => {
         await rabbit.registerEventConsumer(fullEventName, (c, e) => {
@@ -67,9 +67,7 @@ describe('Integration tests', () => {
       const eventCount = 3;
 
       return new Promise(async (resolve) => {
-        const contexts = _.map(_.range(eventCount), i => {
-          return { eventNumber: i };
-        });
+        const contexts = Array.from({ length: eventCount }, (_, eventNumber) => ({ eventNumber }));
 
         let eventsConsumed = 0;
 
@@ -94,14 +92,12 @@ describe('Integration tests', () => {
       const consumerCount = 3;
       const eventCount = consumerCount * 3;
 
-      const consumerIds = _.range(consumerCount);
+      const consumerIds = Array.from({ length: consumerCount }, (_, i) => i);
       const eventsConsumed: number[] = [];
       const eventsConsumedByConsumer: { [consumerId: number]: number } = {};
 
-      const eventIds = _.range(eventCount);
-      const contexts = _.map(eventIds, i => {
-        return { eventNumber: i };
-      });
+      const eventIds = Array.from({ length: eventCount }, (_, i) => i);
+      const contexts = eventIds.map(eventNumber => ({ eventNumber }));
 
       return new Promise(async (resolve) => {
         for (const i of consumerIds) {
@@ -112,7 +108,7 @@ describe('Integration tests', () => {
             eventsConsumedByConsumer[i] = (eventsConsumedByConsumer[i] || 0) + 1;
 
             if (eventsConsumed.length === eventCount) {
-              const eventsConsumedSorted = _.sortBy(eventsConsumed);
+              const eventsConsumedSorted = eventsConsumed.sort();
               expect(eventsConsumedSorted).to.deep.equal(eventIds);
 
               resolve(undefined);
@@ -130,20 +126,18 @@ describe('Integration tests', () => {
       const consumerCount = 3;
       const eventCount = 3;
 
-      const consumerIds = _.range(consumerCount);
+      const consumerIds = Array.from({ length: consumerCount }, (_, i) => i);
       // List of IDs of events consumed by all consumers
       const eventsConsumed: number[] = [];
       // List of IDs of events consumed by each consumer
       const eventsConsumedByConsumer: { [consumerId: number]: number[] } = {};
 
-      const eventIds = _.range(eventCount);
-      const contexts = _.map(eventIds, i => {
-        return { eventNumber: i };
-      });
+      const eventIds = Array.from({ length: eventCount }, (_, i) => i);
+      const contexts = eventIds.map(eventNumber => ({ eventNumber }));
 
       return new Promise(async (resolve) => {
         for (const i of consumerIds) {
-          const consumeOptions = _.defaultsDeep({}, registerEventConsumerOptions, { service: { name: 'service' + i } });
+          const consumeOptions = { ...registerEventConsumerOptions, service: { name: 'service' + i } };
           await rabbit.registerEventConsumer<EventContextWithEventNumber>(fullEventName, (c, e) => { // eslint-disable-line no-loop-func
             expect(e.eventName).to.equal(fullEventName);
 
@@ -156,13 +150,13 @@ describe('Integration tests', () => {
             // If all events have now been consumed by all consumers
             if (eventsConsumed.length === eventCount * consumerCount) {
               // All consumers have consumed something
-              expect(_.size(eventsConsumedByConsumer)).to.equal(eventCount);
+              expect(Object.values(eventsConsumedByConsumer)).to.have.lengthOf(eventCount);
 
               // Check that each consumer has consumed all events
-              _.forOwn(eventsConsumedByConsumer, (eventsConsumed) => {
-                const eventsConsumedSorted = _.sortBy(eventsConsumed);
+              for (const consumerId in eventsConsumedByConsumer) {
+                const eventsConsumedSorted = [ ...eventsConsumedByConsumer[consumerId] ].sort();
                 expect(eventsConsumedSorted).to.deep.equal(eventIds);
-              });
+              }
 
               resolve(undefined);
             }
@@ -178,7 +172,7 @@ describe('Integration tests', () => {
     it('should be able to consume the same event in all instances of the same service', () => {
       const consumerCount = 3;
 
-      const consumerIds = _.range(consumerCount);
+      const consumerIds = Array.from({ length: consumerCount }, (_, i) => i);
       // List of IDs of events consumed by all consumers
       let eventsConsumed = 0;
       // Number of events consumed by each consumer
@@ -186,7 +180,7 @@ describe('Integration tests', () => {
 
       return new Promise(async (resolve) => {
         for (const i of consumerIds) {
-          const consumeOptions = _.defaultsDeep({}, registerEventConsumerOptions, { service: { name: 'my-service' }, uniqueQueue: true });
+          const consumeOptions = { ...registerEventConsumerOptions, service: { name: 'my-service' }, uniqueQueue: true };
           await rabbit.registerEventConsumer<EventContextWithEventNumber>(fullEventName, (c, e) => { // eslint-disable-line no-loop-func
             expect(e.eventName).to.equal(fullEventName);
 
@@ -199,12 +193,10 @@ describe('Integration tests', () => {
             // If all events have now been consumed by all consumers
             if (eventsConsumed === consumerCount) {
               // All consumers have consumed something
-              expect(_.size(eventsConsumedByConsumer)).to.equal(consumerCount);
+              expect(Object.values(eventsConsumedByConsumer)).to.have.lengthOf(consumerCount);
 
               // Check that each consumer has consumed the event
-              _.forOwn(eventsConsumedByConsumer, eventsConsumed => {
-                expect(eventsConsumed).to.equal(1);
-              });
+              expect(Object.values(eventsConsumedByConsumer).every(eventsConsumed => eventsConsumed === 1)).to.equal(true);
 
               resolve(undefined);
             }
@@ -246,7 +238,7 @@ describe('Integration tests', () => {
 
       const eventsConsumedByConsumer: { [consumerId: number]: { context: EventContextWithEventNumber; event: Event }[] } = { 1: [], 2: [], 3: [], 4: [] };
 
-      const emitEventOptionsWithoutServiceName = _.defaultsDeep({ service: { name: false } }, emitEventOptions);
+      const emitEventOptionsWithoutServiceName = { ...emitEventOptions, service: { name: '' } };
 
       await new Promise(async (resolve) => {
         /*
@@ -257,7 +249,7 @@ describe('Integration tests', () => {
             // Store that this event was consumed by this consumer
             eventsConsumedByConsumer[i].push({ context, event });
 
-            const totalEventsConsumed = _.flatten(_.values(eventsConsumedByConsumer)).length;
+            const totalEventsConsumed = Object.values(eventsConsumedByConsumer).flat().length;
             if (totalEventsConsumed === 10) {
               // All events consumed, resolve here and move on to testes
               resolve(undefined);
@@ -280,17 +272,17 @@ describe('Integration tests', () => {
        *
        * Yeah, 1-indexed arrays I know, but it matches the consumer/event numbers
        */
-      let { 1: consumed1, 2: consumed2, 3: consumed3, 4: consumed4 } = eventsConsumedByConsumer;
+      const { 1: consumed1, 2: consumed2, 3: consumed3, 4: consumed4 } = eventsConsumedByConsumer;
       expect(consumed1).to.have.lengthOf(1);
       expect(consumed2).to.have.lengthOf(2);
       expect(consumed3).to.have.lengthOf(3);
       expect(consumed4).to.have.lengthOf(4);
 
       // Sort events for easy comparison
-      consumed1 = _.sortBy(consumed1, 'context.eventNumber');
-      consumed2 = _.sortBy(consumed2, 'context.eventNumber');
-      consumed3 = _.sortBy(consumed3, 'context.eventNumber');
-      consumed4 = _.sortBy(consumed4, 'context.eventNumber');
+      consumed1.sort((a, b) => a.context.eventNumber - b.context.eventNumber);
+      consumed2.sort((a, b) => a.context.eventNumber - b.context.eventNumber);
+      consumed3.sort((a, b) => a.context.eventNumber - b.context.eventNumber);
+      consumed4.sort((a, b) => a.context.eventNumber - b.context.eventNumber);
 
       expect(consumed1[0]).to.containSubset({ event: { eventName: event1 }, context: context1 });
 
@@ -321,10 +313,11 @@ describe('Integration tests', () => {
         for (const i of [ 1, 2, 3, 4 ]) {
 
           // Each consumer needs a different service name to create different queues
-          const consumeOptions = _.defaultsDeep({
+          const consumeOptions: RegisterEventConsumerOptions = {
+            ...registerEventConsumerOptions,
             retry: { backoff: { type: 'fixed', delay: delayMillis / 1000 }, maxAttempts },
             service: { name: 'service' + i }
-          }, registerEventConsumerOptions);
+          };
 
           await rabbit.registerEventConsumer(fullEventName, (context, event) => { // eslint-disable-line no-loop-func
             expect(event.eventName).to.equal(fullEventName);
@@ -337,7 +330,7 @@ describe('Integration tests', () => {
               throw new Error('Failing for the first consumer');
             }
 
-            if (_.isEqual(eventConsumptionsByConsumer, expectedEventConsumptionsByConsumer)) {
+            if (JSON.stringify(eventConsumptionsByConsumer) === JSON.stringify(expectedEventConsumptionsByConsumer)) {
               resolve(undefined);
             }
 
@@ -355,7 +348,7 @@ describe('Integration tests', () => {
       const taskCount = 3 * prefetch;
       const consumeTime = 250;
 
-      const consumerOptions = _.defaultsDeep({ consumer: { prefetch } }, registerEventConsumerOptions);
+      const consumerOptions = { ...registerEventConsumerOptions, consumer: { prefetch } };
       const consumeTimestamps: number[] = [];
 
       await new Promise(async (resolve) => {
@@ -372,7 +365,7 @@ describe('Integration tests', () => {
       });
 
       // Average timestamp of each group of consumptions
-      const timestampMeans = _.chunk(consumeTimestamps, prefetch).map(_.mean);
+      const timestampMeans = chunk(consumeTimestamps, prefetch).map(timestamps => timestamps.reduce((a, b) => a + b, 0) / timestamps.length);
 
       for (let i = 1; i < timestampMeans.length; i++) {
         const diff = timestampMeans[i] - timestampMeans[i - 1];

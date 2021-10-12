@@ -4,7 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const chai_1 = require("chai");
-const lodash_1 = __importDefault(require("lodash"));
+const lodash_chunk_1 = __importDefault(require("lodash.chunk"));
 const bootstrap_test_1 = require("../bootstrap.test");
 describe('Integration tests', () => {
     describe('Tasks', () => {
@@ -37,7 +37,7 @@ describe('Integration tests', () => {
         it('should be able to enqueue a task with a pre-defined UUID and timestamp', () => {
             const uuid = '12341234-1234-1234-1234-123412341234';
             const time = 1511944077916;
-            const enqueueOptions = lodash_1.default.defaults({ uuid, time }, enqueueTaskOptions);
+            const enqueueOptions = { ...enqueueTaskOptions, uuid, time };
             return new Promise(async (resolve) => {
                 await rabbit.registerTaskConsumer(taskName, (c, t) => {
                     (0, chai_1.expect)(t.uuid).to.equal(uuid);
@@ -50,9 +50,7 @@ describe('Integration tests', () => {
         it('should be able to enqueue and consume multiple tasks with a single consumer', () => {
             const taskCount = 3;
             return new Promise(async (resolve) => {
-                const contexts = lodash_1.default.map(lodash_1.default.range(taskCount), i => {
-                    return { taskNumber: i };
-                });
+                const contexts = Array.from({ length: taskCount }, (_, taskNumber) => ({ taskNumber }));
                 let tasksConsumed = 0;
                 await rabbit.registerTaskConsumer(taskName, (c, t) => {
                     (0, chai_1.expect)(t.taskName).to.equal(fullTaskName);
@@ -70,13 +68,11 @@ describe('Integration tests', () => {
         it('should be able to enqueue a multiple tasks, load balanced to multiple consumers within the same service', () => {
             const consumerCount = 3;
             const taskCount = consumerCount * 3;
-            const consumerIds = lodash_1.default.range(consumerCount);
+            const consumerIds = Array.from({ length: consumerCount }, (_, i) => i);
             const tasksConsumed = [];
             const tasksConsumedByConsumer = {};
-            const taskIds = lodash_1.default.range(taskCount);
-            const contexts = lodash_1.default.map(taskIds, i => {
-                return { taskNumber: i };
-            });
+            const taskIds = Array.from({ length: taskCount }, (_, i) => i);
+            const contexts = taskIds.map(i => ({ taskNumber: i }));
             return new Promise(async (resolve) => {
                 for (const i of consumerIds) {
                     await rabbit.registerTaskConsumer(taskName, (c, t) => {
@@ -84,8 +80,8 @@ describe('Integration tests', () => {
                         tasksConsumed.push(c.taskNumber);
                         tasksConsumedByConsumer[i] = (tasksConsumedByConsumer[i] || 0) + 1;
                         if (tasksConsumed.length === taskCount) {
-                            const tasksConsumedSorted = lodash_1.default.sortBy(tasksConsumed);
-                            (0, chai_1.expect)(tasksConsumedSorted).to.deep.equal(taskIds);
+                            tasksConsumed.sort();
+                            (0, chai_1.expect)(tasksConsumed).to.deep.equal(taskIds);
                             resolve(undefined);
                         }
                     }, registerTaskConsumerOptions);
@@ -97,12 +93,12 @@ describe('Integration tests', () => {
         });
         it('should be able to consume the same task in all instances of the same service', () => {
             const consumerCount = 3;
-            const consumerIds = lodash_1.default.range(consumerCount);
+            const consumerIds = Array.from({ length: consumerCount }, (_, i) => i);
             let tasksConsumed = 0;
             const tasksConsumedByConsumer = {};
             return new Promise(async (resolve) => {
                 for (const i of consumerIds) {
-                    const consumeOptions = lodash_1.default.defaultsDeep({}, registerTaskConsumerOptions, { uniqueQueue: true });
+                    const consumeOptions = { ...registerTaskConsumerOptions, uniqueQueue: true };
                     await rabbit.registerTaskConsumer(taskName, (c, e) => {
                         (0, chai_1.expect)(e.taskName).to.equal(fullTaskName);
                         tasksConsumed++;
@@ -111,10 +107,8 @@ describe('Integration tests', () => {
                         }
                         tasksConsumedByConsumer[i]++;
                         if (tasksConsumed === consumerCount) {
-                            (0, chai_1.expect)(lodash_1.default.size(tasksConsumedByConsumer)).to.equal(consumerCount);
-                            lodash_1.default.forOwn(tasksConsumedByConsumer, tasksConsumed => {
-                                (0, chai_1.expect)(tasksConsumed).to.equal(1);
-                            });
+                            (0, chai_1.expect)(Object.values(tasksConsumedByConsumer)).to.have.lengthOf(consumerCount);
+                            (0, chai_1.expect)(Object.values(tasksConsumedByConsumer).every(tasksConsumed => tasksConsumed === 1)).to.equal(true);
                             resolve(undefined);
                         }
                     }, consumeOptions);
@@ -126,7 +120,7 @@ describe('Integration tests', () => {
             return new Promise(async (resolve) => {
                 const delayMillis = 250;
                 const maxAttempts = 4;
-                const consumeOptions = lodash_1.default.defaultsDeep({ retry: { backoff: { type: 'fixed', delay: delayMillis / 1000 }, maxAttempts } }, registerTaskConsumerOptions);
+                const consumeOptions = { ...registerTaskConsumerOptions, retry: { backoff: { type: 'fixed', delay: delayMillis / 1000 }, maxAttempts } };
                 let startTime = Date.now();
                 let attempt = 0;
                 await rabbit.registerTaskConsumer(taskName, (c, e) => {
@@ -155,7 +149,7 @@ describe('Integration tests', () => {
             const prefetch = 3;
             const taskCount = 3 * prefetch;
             const consumeTime = 250;
-            const consumerOptions = lodash_1.default.defaultsDeep({ consumer: { prefetch } }, registerTaskConsumerOptions);
+            const consumerOptions = { ...registerTaskConsumerOptions, consumer: { prefetch } };
             const consumeTimestamps = [];
             await new Promise(async (resolve) => {
                 await rabbit.registerTaskConsumer(taskName, async () => {
@@ -167,7 +161,7 @@ describe('Integration tests', () => {
                 }, consumerOptions);
                 await Promise.all(new Array(taskCount).fill(undefined).map(() => rabbit.enqueueTask(fullTaskName, context, enqueueTaskOptions)));
             });
-            const timestampMeans = lodash_1.default.chunk(consumeTimestamps, prefetch).map(lodash_1.default.mean);
+            const timestampMeans = (0, lodash_chunk_1.default)(consumeTimestamps, prefetch).map(timestamps => timestamps.reduce((a, b) => a + b, 0) / timestamps.length);
             for (let i = 1; i < timestampMeans.length; i++) {
                 const diff = timestampMeans[i] - timestampMeans[i - 1];
                 (0, chai_1.expect)(diff).to.be.at.least(consumeTime - 100).and.at.most(consumeTime + 100);

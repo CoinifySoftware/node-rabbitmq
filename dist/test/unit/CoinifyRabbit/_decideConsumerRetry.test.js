@@ -4,7 +4,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const chai_1 = require("chai");
-const lodash_1 = __importDefault(require("lodash"));
 const CoinifyRabbit_1 = __importDefault(require("../../../src/CoinifyRabbit"));
 describe('CoinifyRabbit', () => {
     describe('#_decideConsumerRetry', () => {
@@ -52,7 +51,7 @@ describe('CoinifyRabbit', () => {
             (0, chai_1.expect)(retryResult.shouldRetry).to.equal(false);
         });
         it('should support infinite retry using fixed backoff with maxAttempts=-1', () => {
-            const specificDelayOptions = lodash_1.default.defaultsDeep({ maxAttempts: -1 }, fixedOptions);
+            const specificDelayOptions = { ...fixedOptions, maxAttempts: -1 };
             let attempt = 0;
             do {
                 const { shouldRetry, delaySeconds } = CoinifyRabbit_1.default._decideConsumerRetry(attempt, specificDelayOptions);
@@ -62,7 +61,7 @@ describe('CoinifyRabbit', () => {
             } while (attempt < 1000);
         });
         it('should compute fixed retry up using specific delay until maxAttempts', () => {
-            const specificDelayOptions = lodash_1.default.defaultsDeep({ backoff: { delay: 180 } }, fixedOptions);
+            const specificDelayOptions = { ...fixedOptions, backoff: { delay: 180 } };
             let attempt = 0;
             do {
                 const { shouldRetry, delaySeconds } = CoinifyRabbit_1.default._decideConsumerRetry(attempt, specificDelayOptions);
@@ -86,7 +85,7 @@ describe('CoinifyRabbit', () => {
             (0, chai_1.expect)(retryResult.shouldRetry).to.equal(false);
         });
         it('should compute exponential backoff using specific base and delay up until maxAttempts', () => {
-            const specificOptions = lodash_1.default.defaultsDeep({ backoff: { delay: 7, base: 7 }, maxAttempts: 7 }, exponentialOptions);
+            const specificOptions = { backoff: { type: 'exponential', delay: 7, base: 7 }, maxAttempts: 7 };
             const expectedDelays = [7, 49, 343, 2401, 16807, 117649, 823543];
             let attempt = 0;
             do {

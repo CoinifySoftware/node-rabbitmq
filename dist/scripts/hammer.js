@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 "use strict";
-const cli = require('cli'), _ = require('lodash'), consoleLogLevel = require('console-log-level');
+const cli = require('cli'), consoleLogLevel = require('console-log-level');
 const CoinifyRabbit = require('../index');
 async function run() {
     const options = cli.parse({
@@ -10,7 +10,7 @@ async function run() {
         contextString: ['c', 'Context of message, as a JSON-encoded string', 'string', '{}']
     });
     const { type, number, name, contextString } = options;
-    if (!type || !_.includes(['task', 'event'], type)) {
+    if (!type || !['task', 'event'].includes(type)) {
         cli.fatal(`Please specify either 'task' or 'event' as Message type (got '${type}')`);
     }
     if (number <= 0) {
@@ -26,7 +26,7 @@ async function run() {
     catch (err) {
         cli.fatal(`Please input a vaild JSON-encoded string as context (got: '${contextString}'`);
     }
-    if (!_.isObject(context)) {
+    if (!Object.isObject(context)) {
         cli.fatal('Please input an object as context');
     }
     const rabbitOptions = {

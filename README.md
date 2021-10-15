@@ -1,15 +1,13 @@
 # node-rabbitmq
 [![npm version](https://badge.fury.io/js/%40coinify%2Frabbitmq.svg)](https://badge.fury.io/js/%40coinify%2Frabbitmq)
 
-## Suggestions for improvement
-* Ping functionality for service health check
-* CLI scripts to emit events / enqueue tasks
-* Split main lib code into smaller files
-
+## Major version changes
+**Version 2**:
+* Publishing messages now defaults to using _publisher confirms_
 
 ## Implementation details
 * Everything happens on the same TCP connection to RabbitMQ. It is created first time it is needed, and cached for subsequent requests.
-* Everything happens on the same channel inside the TCP connection. It is created first time it is needed, and cached for subsequent requests.
+* Message consumption and publishing use separate channels. They are created first time they are needed, and cached for subsequent requests.
 
 ## Connection/channel failure
 If the channel or connection closes unexpectedly (i.e. `#close()` was not called), the library will attempt to reconnect
@@ -146,6 +144,7 @@ behaviour (`false`) where each instance of the service consumes from the same qu
 Setting this to `true` will cause the event to be consumed by _each_ event consumer.
 * `consumer`: Consumer-specific options. Must be an object with the following properties:
   * `prefetch`: Prefetch value for this consumer. See _Prefetch_ section for more information.
+* `usePublisherConfirm`: Use publisher confirms as default for publishing messages. Defaults to `true`.
 * `service`: Service-specific options. Must be an object with the following properties:
   * `name`: Overrides the `options.service.name` set in the `CoinifyRabbit` constructor.
     Prefixes the consumed task name with `name` and a dot (`.`).
@@ -407,3 +406,9 @@ Alternatively, if one is in a scenario where all failed messages should be re-en
 ```js
 const consumerTag = await coinifyRabbit.registerFailedMessageConsumer(async (routingKey, message) => coinifyRabbit.enqueueMessage(routingKey, message));
 ```
+
+## Suggestions for improvement
+* Ping functionality for service health check
+* CLI scripts to emit events / enqueue tasks
+* Split main lib code into smaller files
+

@@ -14,6 +14,7 @@ export interface CoinifyRabbitConstructorOptions extends DeepPartial<CoinifyRabb
 export default class CoinifyRabbit extends EventEmitter {
     private config;
     private logger;
+    private channels;
     private consumers;
     private activeMessageConsumptions;
     private isShuttingDown;
@@ -24,9 +25,6 @@ export default class CoinifyRabbit extends EventEmitter {
     registerTaskConsumer<Context = any>(taskName: string, consumeFn: TaskConsumerFunction<Context>, options?: RegisterTaskConsumerOptions): Promise<string>;
     registerFailedMessageConsumer(consumeFn: FailedMessageConsumerFunction, options?: RegisterFailedMessageConsumerOptions): Promise<string>;
     assertConnection(): Promise<void>;
-    private _channel?;
-    private _getChannelPromise?;
-    _getChannel(): Promise<amqplib.Channel>;
     private _conn?;
     private _getConnectionPromise?;
     _getConnection(): Promise<amqplib.Connection>;
@@ -34,6 +32,7 @@ export default class CoinifyRabbit extends EventEmitter {
     private _onChannelOpened;
     private _recreateRegisteredConsumers;
     private _onChannelClosed;
+    private publishMessage;
     private _connectWithBackoff;
     shutdown(timeout?: number): Promise<void>;
     private _cancelAllConsumers;
@@ -46,6 +45,7 @@ export default class CoinifyRabbit extends EventEmitter {
     private _handleFailedMessage;
     enqueueMessage(queueName: string, messageObject: Event | Task, options?: {
         exchange?: amqplib.Options.Publish;
+        usePublisherConfirm?: boolean;
     }): Promise<Event<any> | Task<any>>;
     private _assertRetryExchangeAndQueue;
     private _assertDelayedTaskExchangeAndQueue;

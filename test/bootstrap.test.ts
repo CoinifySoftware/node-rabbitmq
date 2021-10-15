@@ -8,6 +8,7 @@ import 'mocha';
 import CoinifyRabbit, { CoinifyRabbitConstructorOptions } from '../src/CoinifyRabbit';
 import CoinifyRabbitConfiguration from '../src/CoinifyRabbitConfiguration';
 import DeepPartial from '../src/DeepPartial';
+import ChannelPool from '../src/ChannelPool';
 
 /*
  * Set up chai
@@ -31,21 +32,29 @@ export function createRabbitMQTestInstance(options?: CoinifyRabbitConstructorOpt
       failed: 'test._failed'
     }
   };
-  return new CoinifyRabbit(defaultsDeep(defaultTestOptions, options ));
+  return new CoinifyRabbit(defaultsDeep(defaultTestOptions, options));
+}
+
+export function getChannelPool(rabbit: CoinifyRabbit): ChannelPool {
+  return (rabbit as any).channels;
 }
 
 export async function disableFailedMessageQueue(rabbit: CoinifyRabbit) {
-  const channel = await rabbit._getChannel();
-  const publishStub = sinon.stub(channel, 'publish');
-  const config = (rabbit as any).config as CoinifyRabbitConfiguration;
-  publishStub.withArgs(config.exchanges.failed, sinon.match.any, sinon.match.any, sinon.match.any).returns(true);
-  publishStub.callThrough();
+  const channels = [ await getChannelPool(rabbit).getPublisherChannel(false), await getChannelPool(rabbit).getPublisherChannel(true) ];
+  channels.forEach(channel => {
+    const publishStub = sinon.stub(channel, 'publish');
+    const config = (rabbit as any).config as CoinifyRabbitConfiguration;
+    publishStub.withArgs(config.exchanges.failed, sinon.match.any, sinon.match.any, sinon.match.any).returns(true);
+    publishStub.callThrough();
+  });
 }
 
 export async function reenableFailedMessageQueue(rabbit: CoinifyRabbit) {
-  const channel = await rabbit._getChannel();
-  const publishStub = channel.publish as sinon.SinonStub;
-  publishStub.restore();
+  const channels = [ await getChannelPool(rabbit).getPublisherChannel(false), await getChannelPool(rabbit).getPublisherChannel(true) ];
+  channels.forEach(channel => {
+    const publishStub = channel.publish as sinon.SinonStub;
+    publishStub.restore();
+  });
 }
 
 process.on('unhandledRejection', (err: any) => {

@@ -1,17 +1,18 @@
 import { expect } from 'chai';
-import _ from 'lodash';
 import sinon from 'sinon';
 import CoinifyRabbit from '../../../src/CoinifyRabbit';
+import { getChannelPool } from '../../bootstrap.test';
 
 describe('CoinifyRabbit', () => {
 
   describe('#_handleConsumeRejection', () => {
 
-    let _getChannelStub: sinon.SinonStub,
+    let getPublisherChannelStub: sinon.SinonStub,
       channelPublishStub: sinon.SinonStub,
       _assertRetryExchangeAndQueueStub: sinon.SinonStub,
       _assertDeadLetterExchangeAndQueueStub: sinon.SinonStub,
       _decideConsumerRetryStub: sinon.SinonStub,
+      _publisherChannel: any,
 
       rabbit: CoinifyRabbit;
 
@@ -46,8 +47,9 @@ describe('CoinifyRabbit', () => {
 
       channelPublishStub = sinon.stub();
       channelPublishStub.resolves(true);
-      _getChannelStub = sinon.stub(rabbit, '_getChannel');
-      _getChannelStub.resolves({ publish: channelPublishStub });
+      _publisherChannel = { publish: channelPublishStub };
+      getPublisherChannelStub = sinon.stub(getChannelPool(rabbit), 'getPublisherChannel');
+      getPublisherChannelStub.resolves(_publisherChannel);
       _assertRetryExchangeAndQueueStub = sinon.stub(rabbit as any, '_assertRetryExchangeAndQueue');
       _assertRetryExchangeAndQueueStub.resolves({ retryExchangeName, retryQueueName });
       _assertDeadLetterExchangeAndQueueStub = sinon.stub(rabbit as any, '_assertDeadLetterExchangeAndQueue');
@@ -57,7 +59,7 @@ describe('CoinifyRabbit', () => {
     });
 
     afterEach(() => {
-      _getChannelStub.restore();
+      getPublisherChannelStub.restore();
       _assertRetryExchangeAndQueueStub.restore();
       _assertDeadLetterExchangeAndQueueStub.restore();
       _decideConsumerRetryStub.restore();
@@ -74,7 +76,7 @@ describe('CoinifyRabbit', () => {
       expect(_decideConsumerRetryStub.firstCall.args).to.deep.equal([ task.attempts, options.retry ]);
 
       expect(_assertRetryExchangeAndQueueStub.calledOnce).to.equal(true);
-      expect(_assertRetryExchangeAndQueueStub.firstCall.args).to.deep.equal([ delaySeconds, { exchange: options.exchange, queue: options.queue } ]);
+      expect(_assertRetryExchangeAndQueueStub.firstCall.args).to.deep.equal([ _publisherChannel, delaySeconds, { exchange: options.exchange, queue: options.queue } ]);
 
       expect(_assertDeadLetterExchangeAndQueueStub.notCalled).to.equal(true);
 
@@ -97,7 +99,7 @@ describe('CoinifyRabbit', () => {
       expect(_assertRetryExchangeAndQueueStub.notCalled).to.equal(true);
 
       expect(_assertDeadLetterExchangeAndQueueStub.calledOnce).to.equal(true);
-      expect(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([ { exchange: options.exchange, queue: options.queue } ]);
+      expect(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([ _publisherChannel, { exchange: options.exchange, queue: options.queue } ]);
 
       expect(channelPublishStub.calledOnce).to.equal(true);
       expect(channelPublishStub.firstCall.args).to.have.lengthOf(4);
@@ -122,7 +124,7 @@ describe('CoinifyRabbit', () => {
       expect(_assertRetryExchangeAndQueueStub.notCalled).to.equal(true);
 
       expect(_assertDeadLetterExchangeAndQueueStub.calledOnce).to.equal(true);
-      expect(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([ { exchange: options.exchange, queue: options.queue } ]);
+      expect(_assertDeadLetterExchangeAndQueueStub.firstCall.args).to.deep.equal([ _publisherChannel, { exchange: options.exchange, queue: options.queue } ]);
 
       expect(channelPublishStub.calledOnce).to.equal(true);
       expect(channelPublishStub.firstCall.args).to.have.lengthOf(4);

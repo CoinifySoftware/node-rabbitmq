@@ -1,6 +1,7 @@
 import amqplib from 'amqplib';
 import { expect } from 'chai';
 import sinon from 'sinon';
+import { ChannelType } from '../../../src/ChannelPool';
 import CoinifyRabbit from '../../../src/CoinifyRabbit';
 
 describe('CoinifyRabbit', () => {
@@ -30,17 +31,27 @@ describe('CoinifyRabbit', () => {
       _recreateRegisteredConsumersStub.restore();
     });
 
-    it('should set the channel prefetch limit', async () => {
-      await (rabbit as any)._onChannelOpened(channel);
+    const publisherChannelTypes: ChannelType[] = [ 'publisher', 'publisher-confirm' ];
+    publisherChannelTypes.forEach(type => {
+      it(`should neither set channel prefetch limit nor recreate consumers for ${type} channel`, async () => {
+        await (rabbit as any)._onChannelOpened(channel, type);
 
-      expect(channelPrefetchStub.calledOnce).to.equal(true);
+        expect(channelPrefetchStub.callCount).to.equal(0);
+        expect(_recreateRegisteredConsumersStub.callCount).to.equal(0);
+      });
+    });
+
+    it('should set the channel prefetch limit for consumer channel', async () => {
+      await (rabbit as any)._onChannelOpened(channel, 'consumer');
+
+      expect(channelPrefetchStub.callCount).to.equal(1);
       expect(channelPrefetchStub.firstCall.args).to.deep.equal([ config.channel.prefetch, true ]);
     });
 
-    it('should recreate registered consumers', async () => {
-      await (rabbit as any)._onChannelOpened(channel);
+    it('should recreate registered consumers for consumer channel', async () => {
+      await (rabbit as any)._onChannelOpened(channel, 'consumer');
 
-      expect(_recreateRegisteredConsumersStub.calledOnce).to.equal(true);
+      expect(_recreateRegisteredConsumersStub.callCount).to.equal(1);
       expect(_recreateRegisteredConsumersStub.firstCall.args).to.have.lengthOf(0);
     });
 

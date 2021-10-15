@@ -32,6 +32,8 @@ const crypto_1 = __importDefault(require("crypto"));
 const uuid_1 = require("uuid");
 const events_1 = require("events");
 const CoinifyRabbitConfiguration_1 = require("./CoinifyRabbitConfiguration");
+const ChannelPool_1 = __importStar(require("./ChannelPool"));
+const util_1 = require("util");
 class CoinifyRabbit extends events_1.EventEmitter {
     constructor(options) {
         super();
@@ -41,31 +43,30 @@ class CoinifyRabbit extends events_1.EventEmitter {
         const { logger, ...config } = options !== null && options !== void 0 ? options : {};
         this.config = (0, lodash_defaultsdeep_1.default)({}, config, CoinifyRabbitConfiguration_1.DEFAULT_CONFIGURATION);
         this.logger = logger !== null && logger !== void 0 ? logger : (0, console_log_level_1.default)({ level: this.config.defaultLogLevel });
+        this.channels = new ChannelPool_1.default(this.logger, () => this._getConnection(), (channel, type) => this._onChannelOpened(channel, type), (type, err) => Promise.resolve(this._onChannelClosed(type, err)));
         if (!this.config.service.name) {
             throw new Error('options.service.name must be set');
         }
     }
     async emitEvent(eventName, context, options) {
-        var _a, _b, _c;
+        var _a, _b, _c, _d;
         const serviceName = (_b = (_a = options === null || options === void 0 ? void 0 : options.service) === null || _a === void 0 ? void 0 : _a.name) !== null && _b !== void 0 ? _b : this.config.service.name;
+        const usePublisherConfirm = (_c = options === null || options === void 0 ? void 0 : options.usePublisherConfirm) !== null && _c !== void 0 ? _c : this.config.usePublisherConfirm;
         const fullEventName = serviceName ? serviceName + '.' + eventName : eventName;
         this.logger.trace({ fullEventName, context, options }, 'emitEvent()');
-        const channel = await this._getChannel();
+        const channel = await this.channels.getPublisherChannel(usePublisherConfirm);
         const exchangeName = this.config.exchanges.eventsTopic;
         await channel.assertExchange(exchangeName, 'topic', options === null || options === void 0 ? void 0 : options.exchange);
         const event = {
             eventName: fullEventName,
             context,
-            uuid: (_c = options === null || options === void 0 ? void 0 : options.uuid) !== null && _c !== void 0 ? _c : (0, uuid_1.v4)(),
+            uuid: (_d = options === null || options === void 0 ? void 0 : options.uuid) !== null && _d !== void 0 ? _d : (0, uuid_1.v4)(),
             time: (options === null || options === void 0 ? void 0 : options.time) ? new Date(options.time).getTime() : Date.now(),
             attempts: 0
         };
         const message = Buffer.from(JSON.stringify(event));
-        const publishResult = channel.publish(exchangeName, fullEventName, message);
-        if (!publishResult) {
-            throw new Error('channel.publish() resolved to ' + JSON.stringify(publishResult));
-        }
-        this.logger.info({ event, exchangeName, options }, 'Event emitted');
+        await this.publishMessage(channel, exchangeName, fullEventName, message);
+        this.logger.info({ event, exchangeName, options }, `Event ${event.eventName} emitted`);
         return event;
     }
     async registerEventConsumer(eventKey, consumeFn, options) {
@@ -77,7 +78,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
         const eventQueueName = this._getConsumeEventQueueName(eventKey, serviceName, uniqueQueue);
         const consumeMessageOptions = { ...options, queueName: eventQueueName };
         this.logger.trace({ eventKey, eventQueueName }, 'registerEventConsumer()');
-        const channel = await this._getChannel();
+        const channel = await this.channels.getConsumerChannel();
         await channel.assertExchange(exchangeName, 'topic', options === null || options === void 0 ? void 0 : options.exchange);
         const queueOptions = { ...options === null || options === void 0 ? void 0 : options.queue };
         if (uniqueQueue) {
@@ -92,15 +93,16 @@ class CoinifyRabbit extends events_1.EventEmitter {
         return consumerTag;
     }
     async enqueueTask(fullTaskName, context, options) {
-        var _a, _b, _c, _d;
+        var _a, _b, _c, _d, _e;
         const serviceName = (_b = (_a = options === null || options === void 0 ? void 0 : options.service) === null || _a === void 0 ? void 0 : _a.name) !== null && _b !== void 0 ? _b : this.config.service.name;
-        const channel = await this._getChannel();
-        const delayMillis = (_c = options === null || options === void 0 ? void 0 : options.delayMillis) !== null && _c !== void 0 ? _c : 0;
+        const usePublisherConfirm = (_c = options === null || options === void 0 ? void 0 : options.usePublisherConfirm) !== null && _c !== void 0 ? _c : this.config.usePublisherConfirm;
+        const channel = await this.channels.getPublisherChannel(usePublisherConfirm);
+        const delayMillis = (_d = options === null || options === void 0 ? void 0 : options.delayMillis) !== null && _d !== void 0 ? _d : 0;
         let exchangeName;
         const publishOptions = {};
         if (delayMillis > 0) {
             const delayedAmqpOptions = { exchange: options === null || options === void 0 ? void 0 : options.exchange };
-            const { delayedExchangeName, delayedQueueName } = await this._assertDelayedTaskExchangeAndQueue(delayMillis, delayedAmqpOptions);
+            const { delayedExchangeName, delayedQueueName } = await this._assertDelayedTaskExchangeAndQueue(channel, delayMillis, delayedAmqpOptions);
             exchangeName = delayedExchangeName;
             publishOptions.BCC = delayedQueueName;
         }
@@ -112,18 +114,15 @@ class CoinifyRabbit extends events_1.EventEmitter {
         const task = {
             taskName: fullTaskName,
             context,
-            uuid: (_d = options === null || options === void 0 ? void 0 : options.uuid) !== null && _d !== void 0 ? _d : (0, uuid_1.v4)(),
+            uuid: (_e = options === null || options === void 0 ? void 0 : options.uuid) !== null && _e !== void 0 ? _e : (0, uuid_1.v4)(),
             time: (options === null || options === void 0 ? void 0 : options.time) ? new Date(options.time).getTime() : Date.now(),
             attempts: 0,
             origin: serviceName,
             delayMillis: delayMillis > 0 ? delayMillis : undefined
         };
         const message = Buffer.from(JSON.stringify(task));
-        const publishResult = channel.publish(exchangeName, fullTaskName, message, publishOptions);
-        if (!publishResult) {
-            throw new Error('channel.publish() resolved to ' + JSON.stringify(publishResult));
-        }
-        this.logger.info({ task, exchangeName, options }, 'Enqueued task');
+        await this.publishMessage(channel, exchangeName, fullTaskName, message, publishOptions);
+        this.logger.info({ task, exchangeName, options }, `Task ${task.taskName} enqueued`);
         return task;
     }
     async registerTaskConsumer(taskName, consumeFn, options) {
@@ -136,7 +135,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
         const taskQueueName = this._getTaskConsumerQueueName(taskName, serviceName, uniqueQueue);
         const consumeMessageOptions = { ...options, queueName: taskQueueName };
         this.logger.trace({ taskName, fullTaskName, taskQueueName, exchangeName, options }, 'registerTaskConsumer()');
-        const channel = await this._getChannel();
+        const channel = await this.channels.getConsumerChannel();
         await channel.assertExchange(exchangeName, 'topic', options === null || options === void 0 ? void 0 : options.exchange);
         const queueOptions = { ...options === null || options === void 0 ? void 0 : options.queue };
         if (uniqueQueue) {
@@ -152,7 +151,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
     }
     async registerFailedMessageConsumer(consumeFn, options) {
         var _a, _b;
-        const channel = await this._getChannel();
+        const channel = await this.channels.getConsumerChannel();
         const queueName = this.config.queues.failed;
         this.logger.trace({ queueName }, 'registerFailedMessageConsumer()');
         const q = await channel.assertQueue(queueName, options === null || options === void 0 ? void 0 : options.queue);
@@ -164,39 +163,6 @@ class CoinifyRabbit extends events_1.EventEmitter {
     }
     async assertConnection() {
         await this._getConnection();
-    }
-    async _getChannel() {
-        if (!this._channel) {
-            if (!this._getChannelPromise) {
-                this._getChannelPromise = (async () => {
-                    try {
-                        const connection = await this._getConnection();
-                        this.logger.info({}, 'Opening channel');
-                        this._channel = await connection.createChannel();
-                        this._channel.on('error', err => {
-                            this.logger.warn({ err }, 'RabbitMQ channel error');
-                            delete this._channel;
-                        });
-                        this._channel.on('close', err => {
-                            delete this._channel;
-                            this._onChannelClosed(err);
-                        });
-                        await this._onChannelOpened(this._channel);
-                    }
-                    catch (err) {
-                        this.logger.error({ err }, 'Error creating RabbitMQ channel');
-                    }
-                    finally {
-                        delete this._getChannelPromise;
-                    }
-                })();
-            }
-            await this._getChannelPromise;
-        }
-        if (!this._channel) {
-            throw new Error('Could not create channel to RabbitMQ');
-        }
-        return this._channel;
     }
     async _getConnection() {
         if (!this._conn) {
@@ -255,15 +221,20 @@ class CoinifyRabbit extends events_1.EventEmitter {
         }
         return url;
     }
-    async _onChannelOpened(channel) {
-        this.logger.info({}, 'Channel opened');
-        const prefetch = this.config.channel.prefetch;
-        await channel.prefetch(prefetch, true);
-        await this._recreateRegisteredConsumers();
+    async _onChannelOpened(channel, type) {
+        this.logger.info({ type }, `RabbitMQ ${type} channel opened`);
+        if (type === 'consumer') {
+            const prefetch = this.config.channel.prefetch;
+            await channel.prefetch(prefetch, true);
+            await this._recreateRegisteredConsumers();
+        }
     }
     async _recreateRegisteredConsumers() {
         const consumers = (0, lodash_clonedeep_1.default)(this.consumers);
         this.consumers = [];
+        this.logger.info({
+            consumers: consumers.map(c => ({ type: c.type, key: c.key, tag: c.consumerTag }))
+        }, `Recreating ${consumers.length} registered consumers`);
         for (const consumer of consumers) {
             switch (consumer.type) {
                 case 'event':
@@ -280,16 +251,30 @@ class CoinifyRabbit extends events_1.EventEmitter {
             }
         }
     }
-    _onChannelClosed(err) {
+    _onChannelClosed(type, err) {
         if (this.isShuttingDown) {
-            this.logger.info({ err }, 'Channel closed');
+            this.logger.info({ err, type }, `RabbitMQ ${type} channel closed`);
             return;
         }
-        this.logger.warn({ err }, 'Channel closed unexpectedsly.');
+        this.logger.warn({ err, type }, `RabbitMQ ${type} channel closed unexpectedly: ${err ? err.message : 'No error given'}`);
         if (!this.consumers.length) {
             return;
         }
         return this._connectWithBackoff();
+    }
+    async publishMessage(channel, exchange, routingKey, content, options) {
+        if ((0, ChannelPool_1.isConfirmChannel)(channel)) {
+            await (0, util_1.promisify)(channel.publish).bind(channel)(exchange, routingKey, content, options);
+        }
+        else {
+            const publishResult = channel.publish(exchange, routingKey, content, options);
+            if (!publishResult) {
+                this.logger.warn({
+                    exchange, routingKey, content: content.toString(), options
+                }, `channel.publish() to exchange '${exchange}' with routing key '${routingKey}' returned false`);
+                throw new Error(`channel.publish() to exchange '${exchange}' with routing key '${routingKey}' returned false`);
+            }
+        }
     }
     _connectWithBackoff() {
         const fibonacciBackoff = backoff_1.default.fibonacci({
@@ -301,13 +286,13 @@ class CoinifyRabbit extends events_1.EventEmitter {
                 return;
             }
             this.logger.info({}, `Connecting... (attempt ${number}, delay ${delay}ms)`);
-            if (this._getChannelPromise) {
+            if (this._getConnectionPromise) {
                 return;
             }
-            this._getChannel()
+            this._getConnection()
                 .catch(err => {
                 fibonacciBackoff.backoff();
-                this.logger.warn({ err }, 'Error reconnecting to channel');
+                this.logger.warn({ err }, 'Error reconnecting to RabbitMQ');
             });
         });
         fibonacciBackoff.backoff();
@@ -332,14 +317,10 @@ class CoinifyRabbit extends events_1.EventEmitter {
             await this._waitForConsumersToFinish(timeout);
         }
         if (this.activeMessageConsumptions.length > 0) {
-            const channel = await this._getChannel();
+            const channel = await this.channels.getConsumerChannel();
             channel.nackAll();
         }
-        if (this._channel) {
-            this.logger.info({}, 'Closing channel');
-            await this._channel.close();
-            delete this._channel;
-        }
+        await this.channels.close();
         if (this._conn) {
             this.logger.info({}, 'Closing connection');
             await this._conn.close();
@@ -347,7 +328,10 @@ class CoinifyRabbit extends events_1.EventEmitter {
         }
     }
     async _cancelAllConsumers() {
-        const channel = await this._getChannel();
+        if (!this.channels.isChannelOpen('consumer')) {
+            return;
+        }
+        const channel = await this.channels.getConsumerChannel();
         this.logger.info({}, 'Cancelling all consumers');
         await Promise.all(this.consumers.map(c => channel.cancel(c.consumerTag)));
         this.consumers = [];
@@ -400,7 +384,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
             }
             return options.onCancel();
         }
-        const channel = await this._getChannel();
+        const channel = await this.channels.getConsumerChannel();
         const msgObj = JSON.parse(message.content.toString());
         const context = msgObj.context;
         const name = messageType === 'event' ? msgObj.eventName : msgObj.taskName;
@@ -470,19 +454,19 @@ class CoinifyRabbit extends events_1.EventEmitter {
         }
         const retryAmqpOptions = { exchange: options.exchange, queue: options.queue };
         const publishOptions = {};
+        const channel = await this.channels.getPublisherChannel(this.config.usePublisherConfirm);
         let republishExchangeName;
         if (shouldRetry) {
-            const retryExchangeAndQueue = await this._assertRetryExchangeAndQueue(delaySeconds, retryAmqpOptions);
+            const retryExchangeAndQueue = await this._assertRetryExchangeAndQueue(channel, delaySeconds, retryAmqpOptions);
             republishExchangeName = retryExchangeAndQueue.retryExchangeName;
             publishOptions.BCC = retryExchangeAndQueue.retryQueueName;
         }
         else {
-            republishExchangeName = await this._assertDeadLetterExchangeAndQueue(retryAmqpOptions);
+            republishExchangeName = await this._assertDeadLetterExchangeAndQueue(channel, retryAmqpOptions);
         }
         messageObject = (0, lodash_clonedeep_1.default)(messageObject);
         messageObject.attempts = (messageObject.attempts || 0) + 1;
         const updatedMessage = Buffer.from(JSON.stringify(messageObject));
-        const channel = await this._getChannel();
         const routingKey = options.queueName;
         const publishResult = channel.publish(republishExchangeName, routingKey, updatedMessage, publishOptions);
         if (!publishResult) {
@@ -508,7 +492,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
             }
             return options.onCancel();
         }
-        const channel = await this._getChannel();
+        const channel = await this.channels.getConsumerChannel();
         const msgObj = JSON.parse(message.content.toString());
         this.logger.debug({ message: msgObj }, 'message from failed queue ready to be consumed');
         this.activeMessageConsumptions.push(msgObj);
@@ -528,7 +512,9 @@ class CoinifyRabbit extends events_1.EventEmitter {
         this.emit('messageConsumed', msgObj);
     }
     async enqueueMessage(queueName, messageObject, options) {
-        const channel = await this._getChannel();
+        var _a;
+        const usePublisherConfirm = (_a = options === null || options === void 0 ? void 0 : options.usePublisherConfirm) !== null && _a !== void 0 ? _a : this.config.usePublisherConfirm;
+        const channel = await this.channels.getPublisherChannel(usePublisherConfirm);
         const message = Buffer.from(JSON.stringify(messageObject));
         const exchangeName = '';
         const publishResult = channel.publish(exchangeName, queueName, message, options === null || options === void 0 ? void 0 : options.exchange);
@@ -538,8 +524,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
         this.logger.info({ messageObject, exchangeName, options }, 'Enqueued message');
         return messageObject;
     }
-    async _assertRetryExchangeAndQueue(delaySeconds, options) {
-        const channel = await this._getChannel();
+    async _assertRetryExchangeAndQueue(channel, delaySeconds, options) {
         const delayMs = Math.round(delaySeconds * 1000);
         const retryExchangeName = this.config.exchanges.retry;
         const retryQueueName = this.config.queues.retryPrefix + '.' + delayMs + 'ms';
@@ -553,8 +538,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
         await channel.bindQueue(q.queue, retryExchangeName, q.queue);
         return { retryExchangeName, retryQueueName };
     }
-    async _assertDelayedTaskExchangeAndQueue(delayMillis, options) {
-        const channel = await this._getChannel();
+    async _assertDelayedTaskExchangeAndQueue(channel, delayMillis, options) {
         const delayedExchangeName = this.config.exchanges.delayed;
         const delayedQueueName = this.config.queues.delayedTaskPrefix + '.' + delayMillis + 'ms';
         const exchangeOptions = { ...options === null || options === void 0 ? void 0 : options.exchange, autoDelete: true };
@@ -571,8 +555,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
         await channel.bindQueue(q.queue, delayedExchangeName, q.queue);
         return { delayedExchangeName, delayedQueueName };
     }
-    async _assertDeadLetterExchangeAndQueue(options) {
-        const channel = await this._getChannel();
+    async _assertDeadLetterExchangeAndQueue(channel, options) {
         const deadLetterExchangeName = this.config.exchanges.failed;
         const deadLetterQueueName = this.config.queues.failed;
         await channel.assertExchange(deadLetterExchangeName, 'fanout', options === null || options === void 0 ? void 0 : options.exchange);

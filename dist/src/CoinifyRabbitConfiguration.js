@@ -32,5 +32,6 @@ exports.DEFAULT_CONFIGURATION = {
     consumer: {
         prefetch: 2
     },
+    usePublisherConfirm: true,
     defaultLogLevel: 'error'
 };

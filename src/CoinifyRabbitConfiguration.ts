@@ -32,6 +32,7 @@ export default interface CoinifyRabbitConfiguration {
   consumer: {
     prefetch: number;
   };
+  usePublisherConfirm: boolean;
   defaultLogLevel: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 }
 
@@ -65,5 +66,6 @@ export const DEFAULT_CONFIGURATION: CoinifyRabbitConfiguration = {
   consumer: {
     prefetch: 2
   },
+  usePublisherConfirm: true,
   defaultLogLevel: 'error'
 };

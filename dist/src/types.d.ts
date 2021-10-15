@@ -5,6 +5,7 @@ export interface EnqueueMessageOptions {
     time?: number;
     service?: ServiceConfiguration;
     exchange?: amqplib.Options.AssertExchange;
+    usePublisherConfirm?: boolean;
 }
 export interface RetryExponentialBackoffConfiguration {
     type?: 'exponential';

@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-import _ from 'lodash';
 import CoinifyRabbit from '../../src/CoinifyRabbit';
 import { createRabbitMQTestInstance } from '../bootstrap.test';
 
@@ -155,8 +154,9 @@ describe('Integration tests', () => {
       await rabbit.shutdown();
     }).timeout(3000);
 
-    it('should just close connection and channel if no consumer functions are registered', async () => {
-      await rabbit._getChannel();
+    it('should just close connection and channels if no consumer functions are registered', async () => {
+      // Emit an event just to open a channel
+      await rabbit.emitEvent('my-event', {}, enqueueOptions);
       const startTime = Date.now();
 
       await rabbit.shutdown();

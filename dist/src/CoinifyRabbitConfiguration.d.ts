@@ -30,6 +30,7 @@ export default interface CoinifyRabbitConfiguration {
     consumer: {
         prefetch: number;
     };
+    usePublisherConfirm: boolean;
     defaultLogLevel: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 }
 export declare const DEFAULT_CONFIGURATION: CoinifyRabbitConfiguration;

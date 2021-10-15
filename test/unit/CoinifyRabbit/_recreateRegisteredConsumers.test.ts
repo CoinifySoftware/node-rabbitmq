@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-import _ from 'lodash';
 import sinon from 'sinon';
 import CoinifyRabbit from '../../../src/CoinifyRabbit';
 

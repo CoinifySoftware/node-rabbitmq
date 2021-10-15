@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import CoinifyRabbit from '../../src/CoinifyRabbit';
-import { createRabbitMQTestInstance } from '../bootstrap.test';
+import { createRabbitMQTestInstance, getChannelPool } from '../bootstrap.test';
 
 describe('Integration tests', () => {
   describe('Connection', () => {
@@ -35,9 +35,12 @@ describe('Integration tests', () => {
           }
         };
 
+        const channelPool = getChannelPool(rabbit);
+
         // Store connection and channel objects so we can check that new ones were made
         const initialConnection = await rabbit._getConnection();
-        const initialChannel = await rabbit._getChannel();
+        const initialConsumerChannel = await channelPool.getConsumerChannel();
+        const initialPublisherChannel = await channelPool.getPublisherChannel(true);
 
         // Attach an event consumer and a task consumer
         await rabbit.registerEventConsumer(serviceName + '.my-event', (c, e) => {
@@ -62,7 +65,8 @@ describe('Integration tests', () => {
 
         // Check that we have new connection and channel objects
         expect(await rabbit._getConnection()).to.not.equal(initialConnection);
-        expect(await rabbit._getChannel()).to.not.equal(initialChannel);
+        expect(await channelPool.getConsumerChannel()).to.not.equal(initialConsumerChannel);
+        expect(await channelPool.getPublisherChannel(true)).to.not.equal(initialPublisherChannel);
 
         // Emit an event and a enqueue a task to check that the consumers have been re-attached
         await rabbit.emitEvent('my-event', eventContext, enqueueOptions);
@@ -71,8 +75,8 @@ describe('Integration tests', () => {
     });
 
     it('should not reconnect on requested shutdown()', async () => {
-      // Connect
-      await rabbit._getChannel();
+      // Emit an event to connect and create a channel
+      await rabbit.emitEvent('my.event', {}, enqueueOptions);
 
       // Close again
       await rabbit.shutdown();

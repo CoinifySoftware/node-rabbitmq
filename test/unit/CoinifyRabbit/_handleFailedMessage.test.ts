@@ -1,12 +1,13 @@
 import { expect } from 'chai';
 import sinon from 'sinon';
 import CoinifyRabbit from '../../../src/CoinifyRabbit';
+import { getChannelPool } from '../../bootstrap.test';
 
 describe('CoinifyRabbit', () => {
 
   describe('#_handleFailedMessage', () => {
 
-    let _getChannelStub: sinon.SinonStub,
+    let getConsumerChannelStub: sinon.SinonStub,
       consumeFnStub: sinon.SinonStub,
       channelAckStub: sinon.SinonStub,
       channelNackStub: sinon.SinonStub,
@@ -38,12 +39,12 @@ describe('CoinifyRabbit', () => {
       channelAckStub = sinon.stub();
       channelNackStub = sinon.stub();
       consumeFnStub = sinon.stub();
-      _getChannelStub = sinon.stub(rabbit, '_getChannel');
-      _getChannelStub.resolves({ ack: channelAckStub, nack: channelNackStub });
+      getConsumerChannelStub = sinon.stub(getChannelPool(rabbit), 'getConsumerChannel');
+      getConsumerChannelStub.resolves({ ack: channelAckStub, nack: channelNackStub });
     });
 
     afterEach(() => {
-      _getChannelStub.restore();
+      getConsumerChannelStub.restore();
     });
 
     it('should call consumeFn and ack if consumeFn resolves', async () => {

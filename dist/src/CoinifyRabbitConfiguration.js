@@ -29,6 +29,9 @@ exports.DEFAULT_CONFIGURATION = {
         delayedTaskPrefix: '_delay.tasks',
         failed: '_failed'
     },
+    publish: {
+        persistentMessages: true
+    },
     consumer: {
         prefetch: 2
     },

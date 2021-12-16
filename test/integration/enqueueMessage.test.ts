@@ -1,7 +1,8 @@
 import { expect } from 'chai';
+import { SinonSpy } from 'sinon';
 import CoinifyRabbit from '../../src/CoinifyRabbit';
 import Task from '../../src/messageTypes/Task';
-import { createRabbitMQTestInstance } from '../bootstrap.test';
+import { createRabbitMQTestInstance, registerChannelPublishSpy, unregisterChannelPublishSpy } from '../bootstrap.test';
 
 describe('Integration tests', () => {
 
@@ -12,19 +13,29 @@ describe('Integration tests', () => {
     const registerConsumerOptions = { exchange: { autoDelete: true }, queue: { autoDelete: true } };
 
     let rabbit: CoinifyRabbit;
+
+    let publishSpy: SinonSpy;
+
     before(() => {
       rabbit = createRabbitMQTestInstance({ service: { name: serviceName } });
+    });
+
+    beforeEach(async () => {
+      publishSpy = await registerChannelPublishSpy(rabbit, true);
+    });
+    afterEach(async () => {
+      await unregisterChannelPublishSpy(rabbit, true);
     });
 
     after(async () => {
       await rabbit.shutdown();
     });
 
-    it('should consume enqueued message of type event', () => {
+    it('should consume enqueued message of type event', async () => {
       const eventName = 'my-failed-message' + Math.random();
       const fullEventName = serviceName + '.' + eventName;
 
-      return new Promise(async (resolve) => {
+      await new Promise(async (resolve) => {
         await rabbit.registerEventConsumer(fullEventName, (c, e) => {
           expect(e.eventName).to.equal(fullEventName);
           expect(c).to.deep.equal(context);
@@ -44,13 +55,16 @@ describe('Integration tests', () => {
 
         await rabbit.enqueueMessage(routingKey, messageObject);
       });
+
+      expect(publishSpy.callCount).to.equal(1);
+      expect(publishSpy.firstCall.args[3]).to.containSubset({ persistent: true });
     });
 
-    it('should consume enqueued message of type task', () => {
+    it('should consume enqueued message of type task', async () => {
       const taskName = 'my-task' + Math.random();
       const fullTaskName = serviceName + '.' + taskName;
 
-      return new Promise(async (resolve) => {
+      await new Promise(async (resolve) => {
         await rabbit.registerTaskConsumer(taskName, (c, t) => {
           expect(t.taskName).to.equal(fullTaskName);
           expect(c).to.deep.equal(context);
@@ -70,6 +84,9 @@ describe('Integration tests', () => {
 
         await rabbit.enqueueMessage(queueName, messageObject);
       });
+
+      expect(publishSpy.callCount).to.equal(1);
+      expect(publishSpy.firstCall.args[3]).to.containSubset({ persistent: true });
     });
   });
 });

@@ -263,14 +263,18 @@ class CoinifyRabbit extends events_1.EventEmitter {
         return this._connectWithBackoff();
     }
     async publishMessage(channel, exchange, routingKey, content, options) {
+        const publishOptions = {
+            persistent: this.config.publish.persistentMessages,
+            ...options
+        };
         if ((0, ChannelPool_1.isConfirmChannel)(channel)) {
-            await (0, util_1.promisify)(channel.publish).bind(channel)(exchange, routingKey, content, options);
+            await (0, util_1.promisify)(channel.publish).bind(channel)(exchange, routingKey, content, publishOptions);
         }
         else {
-            const publishResult = channel.publish(exchange, routingKey, content, options);
+            const publishResult = channel.publish(exchange, routingKey, content, publishOptions);
             if (!publishResult) {
                 this.logger.warn({
-                    exchange, routingKey, content: content.toString(), options
+                    exchange, routingKey, content: content.toString(), publishOptions
                 }, `channel.publish() to exchange '${exchange}' with routing key '${routingKey}' returned false`);
                 throw new Error(`channel.publish() to exchange '${exchange}' with routing key '${routingKey}' returned false`);
             }
@@ -468,15 +472,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
         messageObject.attempts = (messageObject.attempts || 0) + 1;
         const updatedMessage = Buffer.from(JSON.stringify(messageObject));
         const routingKey = options.queueName;
-        const publishResult = channel.publish(republishExchangeName, routingKey, updatedMessage, publishOptions);
-        if (!publishResult) {
-            const err = new Error(`channel.publish() to exchange '${republishExchangeName}' with routing key '${routingKey}'`
-                + ` resolved to ${JSON.stringify(publishResult)}`);
-            err.republishExchangeName = republishExchangeName;
-            err.routingKey = routingKey;
-            err.updatedMessage = updatedMessage;
-            throw err;
-        }
+        await this.publishMessage(channel, republishExchangeName, routingKey, updatedMessage, publishOptions);
         const logContext = { [messageType]: messageObject, routingKey, shouldRetry, delaySeconds, publishOptions };
         if (shouldRetry) {
             this.logger.trace(logContext, `Scheduled ${messageType} for retry`);
@@ -517,10 +513,7 @@ class CoinifyRabbit extends events_1.EventEmitter {
         const channel = await this.channels.getPublisherChannel(usePublisherConfirm);
         const message = Buffer.from(JSON.stringify(messageObject));
         const exchangeName = '';
-        const publishResult = channel.publish(exchangeName, queueName, message, options === null || options === void 0 ? void 0 : options.exchange);
-        if (!publishResult) {
-            throw new Error('channel.publish() resolved to ' + JSON.stringify(publishResult));
-        }
+        await this.publishMessage(channel, exchangeName, queueName, message, options === null || options === void 0 ? void 0 : options.exchange);
         this.logger.info({ messageObject, exchangeName, options }, 'Enqueued message');
         return messageObject;
     }

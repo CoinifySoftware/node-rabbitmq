@@ -452,13 +452,18 @@ export default class CoinifyRabbit extends EventEmitter {
   }
 
   private async publishMessage(channel: amqplib.Channel, exchange: string, routingKey: string, content: Buffer, options?: amqplib.Options.Publish): Promise<void> {
+    const publishOptions: amqplib.Options.Publish = {
+      persistent: this.config.publish.persistentMessages,
+      ...options
+    };
+
     if (isConfirmChannel(channel)) {
-      await promisify(channel.publish).bind(channel)(exchange, routingKey, content, options);
+      await promisify(channel.publish).bind(channel)(exchange, routingKey, content, publishOptions);
     } else {
-      const publishResult = channel.publish(exchange, routingKey, content, options);
+      const publishResult = channel.publish(exchange, routingKey, content, publishOptions);
       if (!publishResult) {
         this.logger.warn({
-          exchange, routingKey, content: content.toString(), options
+          exchange, routingKey, content: content.toString(), publishOptions
         }, `channel.publish() to exchange '${exchange}' with routing key '${routingKey}' returned false`);
 
         throw new Error(`channel.publish() to exchange '${exchange}' with routing key '${routingKey}' returned false`);
@@ -821,17 +826,7 @@ export default class CoinifyRabbit extends EventEmitter {
 
     // Publish updated message to dead letter exchange
     const routingKey = options.queueName;
-
-    const publishResult = channel.publish(republishExchangeName, routingKey, updatedMessage, publishOptions);
-    if (!publishResult) {
-      const err = new Error(`channel.publish() to exchange '${republishExchangeName}' with routing key '${routingKey}'`
-        + ` resolved to ${JSON.stringify(publishResult)}`);
-      // Add extra properties to error
-      (err as any).republishExchangeName = republishExchangeName;
-      (err as any).routingKey = routingKey;
-      (err as any).updatedMessage = updatedMessage;
-      throw err;
-    }
+    await this.publishMessage(channel, republishExchangeName, routingKey, updatedMessage, publishOptions);
 
     // Log action
     const logContext = { [messageType]: messageObject, routingKey, shouldRetry, delaySeconds, publishOptions };
@@ -904,11 +899,7 @@ export default class CoinifyRabbit extends EventEmitter {
 
     // Empty string is the default direct exchange
     const exchangeName = '';
-    const publishResult = channel.publish(exchangeName, queueName, message, options?.exchange);
-
-    if (!publishResult) {
-      throw new Error('channel.publish() resolved to ' + JSON.stringify(publishResult));
-    }
+    await this.publishMessage(channel, exchangeName, queueName, message, options?.exchange);
 
     this.logger.info({ messageObject, exchangeName, options }, 'Enqueued message');
 

@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import sinon from 'sinon';
+import sinon, { SinonSpy } from 'sinon';
 import chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import chaiSubset from 'chai-subset';
@@ -55,6 +55,17 @@ export async function reenableFailedMessageQueue(rabbit: CoinifyRabbit) {
     const publishStub = channel.publish as sinon.SinonStub;
     publishStub.restore();
   });
+}
+
+export async function registerChannelPublishSpy(rabbit: CoinifyRabbit, usePublisherConfirm: boolean) {
+  return sinon.spy(await getChannelPool(rabbit).getPublisherChannel(usePublisherConfirm), 'publish');
+}
+
+export async function unregisterChannelPublishSpy(rabbit: CoinifyRabbit, usePublisherConfirm: boolean) {
+  const publish = (await getChannelPool(rabbit).getPublisherChannel(usePublisherConfirm)).publish;
+  if ((publish as SinonSpy).restore) {
+    (publish as SinonSpy).restore();
+  }
 }
 
 process.on('unhandledRejection', (err: any) => {

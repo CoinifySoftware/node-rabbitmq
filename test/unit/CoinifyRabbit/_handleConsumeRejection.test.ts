@@ -85,7 +85,7 @@ describe('CoinifyRabbit', () => {
       expect(channelPublishStub.firstCall.args[0]).to.equal(retryExchangeName);
       expect(channelPublishStub.firstCall.args[1]).to.equal(options.queueName);
       expect(channelPublishStub.firstCall.args[2]).to.be.instanceof(Buffer);
-      expect(channelPublishStub.firstCall.args[3]).to.deep.equal({ BCC: retryQueueName });
+      expect(channelPublishStub.firstCall.args[3]).to.deep.equal({ BCC: retryQueueName, persistent: true });
       const messageDecoded = JSON.parse(channelPublishStub.firstCall.args[2].toString());
       expect(messageDecoded).to.deep.equal({ ...task, attempts: task.attempts + 1 });
     });
@@ -106,7 +106,7 @@ describe('CoinifyRabbit', () => {
       expect(channelPublishStub.firstCall.args[0]).to.equal(retryExchangeName);
       expect(channelPublishStub.firstCall.args[1]).to.equal(options.queueName);
       expect(channelPublishStub.firstCall.args[2]).to.be.instanceof(Buffer);
-      expect(channelPublishStub.firstCall.args[3]).to.deep.equal({});
+      expect(channelPublishStub.firstCall.args[3]).to.deep.equal({ persistent: true });
       const messageDecoded = JSON.parse(channelPublishStub.firstCall.args[2].toString());
       expect(messageDecoded).to.deep.equal({ ...task, attempts: task.attempts + 1 });
     });
@@ -129,7 +129,7 @@ describe('CoinifyRabbit', () => {
       expect(channelPublishStub.calledOnce).to.equal(true);
       expect(channelPublishStub.firstCall.args).to.have.lengthOf(4);
       expect(channelPublishStub.firstCall.args[0]).to.equal(retryExchangeName);
-      expect(channelPublishStub.firstCall.args[3]).to.deep.equal({});
+      expect(channelPublishStub.firstCall.args[3]).to.deep.equal({ persistent: true });
     });
 
     it('should reject if type is neither task nor event', async () => {

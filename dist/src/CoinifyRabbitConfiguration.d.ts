@@ -27,6 +27,9 @@ export default interface CoinifyRabbitConfiguration {
         delayedTaskPrefix: string;
         failed: string;
     };
+    publish: {
+        persistentMessages: boolean;
+    };
     consumer: {
         prefetch: number;
     };

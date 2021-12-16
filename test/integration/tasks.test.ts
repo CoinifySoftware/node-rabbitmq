@@ -1,8 +1,9 @@
 import { expect } from 'chai';
 import chunk from 'lodash.chunk';
+import { SinonSpy } from 'sinon';
 import { RegisterTaskConsumerOptions } from '../..';
 import CoinifyRabbit from '../../src/CoinifyRabbit';
-import { createRabbitMQTestInstance, disableFailedMessageQueue, reenableFailedMessageQueue } from '../bootstrap.test';
+import { createRabbitMQTestInstance, disableFailedMessageQueue, reenableFailedMessageQueue, registerChannelPublishSpy, unregisterChannelPublishSpy } from '../bootstrap.test';
 
 describe('Integration tests', () => {
   describe('Tasks', () => {
@@ -16,13 +17,19 @@ describe('Integration tests', () => {
 
     let rabbit: CoinifyRabbit;
 
+    let publishSpy: SinonSpy;
+
     before(() => {
       rabbit = createRabbitMQTestInstance({ service: { name: serviceName } });
     });
 
-    beforeEach(() => {
+    beforeEach( async () => {
       taskName = 'my-task' + Math.random();
       fullTaskName = serviceName + '.' + taskName;
+      publishSpy = await registerChannelPublishSpy(rabbit, true);
+    });
+    afterEach(async () => {
+      await unregisterChannelPublishSpy(rabbit, true);
     });
 
     after(async () => {
@@ -39,6 +46,13 @@ describe('Integration tests', () => {
         }, registerTaskConsumerOptions);
         await rabbit.enqueueTask(fullTaskName, context, enqueueTaskOptions);
       });
+    });
+
+    it('should publish a task as a persistent message', async () => {
+      await rabbit.enqueueTask(taskName, context, enqueueTaskOptions);
+
+      expect(publishSpy.callCount).to.equal(1);
+      expect(publishSpy.firstCall.args[3]).to.containSubset({ persistent: true });
     });
 
     it('should be able to enqueue a task with a pre-defined UUID and timestamp', () => {
@@ -249,6 +263,8 @@ describe('Integration tests', () => {
       const err = new Error('The error');
       const context = { theContext: true };
 
+      // Unwrap publish function before calling disableFailedMessageQueue() below
+      await unregisterChannelPublishSpy(rabbit, true);
       await disableFailedMessageQueue(rabbit);
 
       await new Promise(async (resolve, reject) => {
@@ -288,6 +304,8 @@ describe('Integration tests', () => {
       const err = new Error('The error');
       const context = { theContext: true };
 
+      // Unwrap publish function before calling disableFailedMessageQueue() below
+      await unregisterChannelPublishSpy(rabbit, true);
       await disableFailedMessageQueue(rabbit);
 
       await new Promise(async (resolve, reject) => {

@@ -29,6 +29,9 @@ export default interface CoinifyRabbitConfiguration {
     delayedTaskPrefix: string;
     failed: string;
   };
+  publish: {
+    persistentMessages: boolean;
+  };
   consumer: {
     prefetch: number;
   };
@@ -62,6 +65,9 @@ export const DEFAULT_CONFIGURATION: CoinifyRabbitConfiguration = {
     retryPrefix: '_retry',
     delayedTaskPrefix: '_delay.tasks',
     failed: '_failed'
+  },
+  publish: {
+    persistentMessages: true
   },
   consumer: {
     prefetch: 2

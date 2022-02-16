@@ -48,13 +48,6 @@ describe('CoinifyRabbit', () => {
       expect(channelPrefetchStub.firstCall.args).to.deep.equal([ config.channel.prefetch, true ]);
     });
 
-    it('should recreate registered consumers for consumer channel', async () => {
-      await (rabbit as any)._onChannelOpened(channel, 'consumer');
-
-      expect(_recreateRegisteredConsumersStub.callCount).to.equal(1);
-      expect(_recreateRegisteredConsumersStub.firstCall.args).to.have.lengthOf(0);
-    });
-
   });
 
 });

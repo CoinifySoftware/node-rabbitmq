@@ -35,13 +35,6 @@ describe('Integration tests', () => {
           }
         };
 
-        const channelPool = getChannelPool(rabbit);
-
-        // Store connection and channel objects so we can check that new ones were made
-        const initialConnection = await rabbit._getConnection();
-        const initialConsumerChannel = await channelPool.getConsumerChannel();
-        const initialPublisherChannel = await channelPool.getPublisherChannel(true);
-
         // Attach an event consumer and a task consumer
         await rabbit.registerEventConsumer(serviceName + '.my-event', (c, e) => {
           expect(c).to.deep.equal(eventContext);
@@ -63,15 +56,27 @@ describe('Integration tests', () => {
         // Wait a moment
         await new Promise(resolve => setTimeout(resolve, 250));
 
-        // Check that we have new connection and channel objects
-        expect(await rabbit._getConnection()).to.not.equal(initialConnection);
-        expect(await channelPool.getConsumerChannel()).to.not.equal(initialConsumerChannel);
-        expect(await channelPool.getPublisherChannel(true)).to.not.equal(initialPublisherChannel);
-
         // Emit an event and a enqueue a task to check that the consumers have been re-attached
         await rabbit.emitEvent('my-event', eventContext, enqueueOptions);
         await rabbit.enqueueTask('my-test-service.my-task', taskContext, enqueueOptions);
       });
+    });
+
+    it('should reconnect and create new channels on unexpected disconnect', async () => {
+      const channelPool = getChannelPool(rabbit);
+
+      // Store connection and channel objects so we can check that new ones were made
+      const initialConnection = await rabbit._getConnection();
+      const initialConsumerChannel = await channelPool.getConsumerChannel();
+      const initialPublisherChannel = await channelPool.getPublisherChannel(true);
+
+      // Time to fake a disconnect:
+      (rabbit as any)._conn.connection.onSocketError(new Error('my err'));
+
+      // Check that we have new connection and channel objects
+      expect(await rabbit._getConnection()).to.not.equal(initialConnection);
+      expect(await channelPool.getConsumerChannel()).to.not.equal(initialConsumerChannel);
+      expect(await channelPool.getPublisherChannel(true)).to.not.equal(initialPublisherChannel);
     });
 
     it('should not reconnect on requested shutdown()', async () => {

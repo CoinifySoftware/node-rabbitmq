@@ -314,10 +314,10 @@ export default class CoinifyRabbit extends EventEmitter {
             });
             this._conn.on('close', err => {
               delete this._conn;
-              this.logger.info({ err }, 'Connection closed');
+              this.logger.info({ err }, 'RabbitMQ Connection closed');
             });
 
-            this.logger.info({}, 'Connection opened');
+            await this.onConnectionOpened();
           } catch (err) {
             this.logger.error({ err }, 'Error connecting to RabbitMQ');
           } finally {
@@ -334,6 +334,14 @@ export default class CoinifyRabbit extends EventEmitter {
     }
 
     return this._conn;
+  }
+
+  private async onConnectionOpened(): Promise<void> {
+    this.logger.info({}, 'RabbitMQ Connection opened');
+
+    if (this.consumers.length) {
+      await this._recreateRegisteredConsumers();
+    }
   }
 
   /**
@@ -385,8 +393,6 @@ export default class CoinifyRabbit extends EventEmitter {
     if (type === 'consumer') {
       const prefetch = this.config.channel.prefetch;
       await channel.prefetch(prefetch, true);
-
-      await this._recreateRegisteredConsumers();
     }
   }
 

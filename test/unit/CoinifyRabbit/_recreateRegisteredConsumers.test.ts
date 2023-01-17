@@ -9,21 +9,21 @@ describe('CoinifyRabbit', () => {
     // TODO Test for prefetch option
 
     let rabbit: any,
-      registerEventConsumerStub: sinon.SinonStub,
-      registerTaskConsumerStub: sinon.SinonStub;
+      bindEventConsumerStub: sinon.SinonStub,
+      bindTaskConsumerStub: sinon.SinonStub;
 
     beforeEach(() => {
       rabbit = new CoinifyRabbit();
 
-      registerEventConsumerStub = sinon.stub(rabbit, 'registerEventConsumer');
-      registerEventConsumerStub.resolves();
-      registerTaskConsumerStub = sinon.stub(rabbit, 'registerTaskConsumer');
-      registerTaskConsumerStub.resolves();
+      bindEventConsumerStub = sinon.stub(rabbit, 'bindEventConsumer');
+      bindEventConsumerStub.resolves();
+      bindTaskConsumerStub = sinon.stub(rabbit, 'bindTaskConsumer');
+      bindTaskConsumerStub.resolves();
     });
 
     afterEach(() => {
-      registerEventConsumerStub.restore();
-      registerTaskConsumerStub.restore();
+      bindEventConsumerStub.restore();
+      bindTaskConsumerStub.restore();
     });
 
     it('should empty list of registered consumers and re-create them', async () => {
@@ -39,17 +39,17 @@ describe('CoinifyRabbit', () => {
 
       expect(rabbit.consumers).to.have.lengthOf(0);
 
-      expect(registerEventConsumerStub.callCount).to.equal(3);
+      expect(bindEventConsumerStub.callCount).to.equal(3);
       let i = 0;
       for (const { key, consumerTag, consumeFn, options } of [ eventConsumer1, eventConsumer2, eventConsumer3 ]) {
-        expect(registerEventConsumerStub.getCall(i).args).to.deep.equal([ key, consumeFn, { ...options, consumerTag } ]);
+        expect(bindEventConsumerStub.getCall(i).args).to.deep.equal([ key, consumeFn, { ...options, consumerTag } ]);
         i++;
       }
 
-      expect(registerTaskConsumerStub.callCount).to.equal(2);
+      expect(bindTaskConsumerStub.callCount).to.equal(2);
       i = 0;
       for (const { key, consumerTag, consumeFn, options } of [ taskConsumer1, taskConsumer2 ]) {
-        expect(registerTaskConsumerStub.getCall(i).args).to.deep.equal([ key, consumeFn, { ...options, consumerTag } ]);
+        expect(bindTaskConsumerStub.getCall(i).args).to.deep.equal([ key, consumeFn, { ...options, consumerTag } ]);
         i++;
       }
     });

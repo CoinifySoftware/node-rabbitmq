@@ -15,6 +15,7 @@ export type EventConsumerFunction<Context = any, Result = any> = (context: Conte
 export interface EventConsumer<Context = any, Result = any> {
   type: 'event';
   consumerTag: string;
+  queueName: string;
   key: string;
   consumeFn: EventConsumerFunction<Context, Result>;
   options?: RegisterEventConsumerOptions;

@@ -16,6 +16,7 @@ export type TaskConsumerFunction<Context = any, Result = any> = (context: Contex
 
 export interface TaskConsumer<Context = any, Result = any> {
   type: 'task';
+  queueName: string;
   consumerTag: string;
   key: string;
   consumeFn: TaskConsumerFunction<Context, Result>;

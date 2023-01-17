@@ -114,24 +114,27 @@ export default class CoinifyRabbit extends EventEmitter {
    *
    * @returns Consumer tag
    */
-  async registerEventConsumer<Context = any>(eventKey: string, consumeFn: EventConsumerFunction<Context>, options?: RegisterEventConsumerOptions): Promise<string> {
+  registerEventConsumer<Context = any>(eventKey: string, consumeFn: EventConsumerFunction<Context>, options: RegisterEventConsumerOptions = {}): Promise<string> {
     CoinifyRabbit.validateConsumerRetryOptions(options?.retry);
 
     const serviceName = options?.service?.name ?? this.config.service.name;
-    const exchangeName = this.config.exchanges.eventsTopic;
-    const { uniqueQueue = false } = options ?? {};
-
+    const { uniqueQueue = false } = options;
     const eventQueueName = this._getConsumeEventQueueName(eventKey, serviceName, uniqueQueue);
 
-    const consumeMessageOptions = { ...options, queueName: eventQueueName };
     this.logger.trace({ eventKey, eventQueueName }, 'registerEventConsumer()');
+    return this.bindEventConsumer(eventKey, eventQueueName, consumeFn, { ...options, uniqueQueue });
+  }
+
+  private async bindEventConsumer<Context = any>( eventKey: string, eventQueueName: string, consumeFn: EventConsumerFunction<Context>, options: RegisterEventConsumerOptions): Promise<string> {
+    const exchangeName = this.config.exchanges.eventsTopic;
+    const consumeMessageOptions = { ...options, queueName: eventQueueName };
 
     const channel = await this.channels.getConsumerChannel();
 
     await channel.assertExchange(exchangeName, 'topic', options?.exchange);
 
     const queueOptions = { ...options?.queue };
-    if (uniqueQueue) {
+    if (options.uniqueQueue) {
       queueOptions.autoDelete = true;
     }
     const q = await channel.assertQueue(eventQueueName, queueOptions);
@@ -144,7 +147,7 @@ export default class CoinifyRabbit extends EventEmitter {
       { consumerTag: options?.consumerTag }
     );
 
-    this.consumers.push({ type: 'event', key: eventKey, consumerTag, consumeFn, options });
+    this.consumers.push({ type: 'event', queueName: eventQueueName, key: eventKey, consumerTag, consumeFn, options });
 
     return consumerTag;
   }
@@ -202,16 +205,22 @@ export default class CoinifyRabbit extends EventEmitter {
    *
    * @returns Consumer tag
    */
-  async registerTaskConsumer<Context = any>(taskName: string, consumeFn: TaskConsumerFunction<Context>, options?: RegisterTaskConsumerOptions) {
+  registerTaskConsumer<Context = any>(taskName: string, consumeFn: TaskConsumerFunction<Context>, options: RegisterTaskConsumerOptions = {}) {
     CoinifyRabbit.validateConsumerRetryOptions(options?.retry);
+    const serviceName = options.service?.name ?? this.config.service.name;
 
-    const serviceName = options?.service?.name ?? this.config.service.name;
-    const exchangeName = this.config.exchanges.tasksTopic;
-    const { uniqueQueue = false } = options ?? {};
+    const { uniqueQueue = false } = options;
 
-    const fullTaskName = serviceName + '.' + taskName;
     const taskQueueName = this._getTaskConsumerQueueName(taskName, serviceName, uniqueQueue);
 
+    return this.bindTaskConsumer(taskName, taskQueueName, consumeFn, options);
+  }
+
+  private async bindTaskConsumer<Context = any>( taskName: string, taskQueueName: string, consumeFn: TaskConsumerFunction<Context>, options: RegisterTaskConsumerOptions): Promise<string> {
+    const serviceName = options.service?.name ?? this.config.service.name;
+    const exchangeName = this.config.exchanges.tasksTopic;
+    const fullTaskName = serviceName + '.' + taskName;
+    const { uniqueQueue = false } = options;
     const consumeMessageOptions = { ...options, queueName: taskQueueName };
     this.logger.trace({ taskName, fullTaskName, taskQueueName, exchangeName, options }, 'registerTaskConsumer()');
 
@@ -233,11 +242,10 @@ export default class CoinifyRabbit extends EventEmitter {
       { consumerTag: options?.consumerTag }
     );
 
-    this.consumers.push({ type: 'task', key: taskName, consumerTag, consumeFn, options });
+    this.consumers.push({ type: 'task', queueName: taskQueueName, key: taskName, consumerTag, consumeFn, options });
 
     return consumerTag;
   }
-
   /**
    * Register a consumer for failed messages
    * This consumer will consume messages from the failed queue, defined either in the configuration or default configuration
@@ -416,10 +424,10 @@ export default class CoinifyRabbit extends EventEmitter {
     for (const consumer of consumers) {
       switch (consumer.type) {
         case 'event':
-          await this.registerEventConsumer(consumer.key, consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag });
+          await this.bindEventConsumer(consumer.key, consumer.queueName, consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag });
           break;
         case 'task':
-          await this.registerTaskConsumer(consumer.key, consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag });
+          await this.bindTaskConsumer(consumer.key, consumer.queueName, consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag });
           break;
         case 'message':
           await this.registerFailedMessageConsumer(consumer.consumeFn, { ...consumer.options, consumerTag: consumer.consumerTag });

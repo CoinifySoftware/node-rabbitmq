@@ -29,7 +29,8 @@ export function createRabbitMQTestInstance(options?: CoinifyRabbitConstructorOpt
     queues: {
       retryPrefix: 'test._retry',
       delayedTaskPrefix: 'test._delay.tasks',
-      failed: 'test._failed'
+      failed: 'test._failed',
+      useQuorumQueues: true
     }
   };
   return new CoinifyRabbit(defaultsDeep(defaultTestOptions, options));

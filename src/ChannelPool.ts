@@ -10,7 +10,7 @@ export default class ChannelPool {
 
   constructor(
     private logger: Logger,
-    private getConnection: () => Promise<amqplib.Connection>,
+    private getConnection: () => Promise<amqplib.ChannelModel>,
     private onChannelOpened: (channel: amqplib.Channel, type: ChannelType) => Promise<void>,
     private onChannelClosed: (type: ChannelType, err?: Error) => Promise<void>
   ) { }

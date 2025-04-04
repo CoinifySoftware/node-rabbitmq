@@ -303,7 +303,7 @@ export default class CoinifyRabbit extends EventEmitter {
     await this._getConnection();
   }
 
-  private _conn?: amqplib.Connection;
+  private _conn?: amqplib.ChannelModel;
   private _getConnectionPromise?: Promise<void>;
 
   /**
@@ -311,7 +311,7 @@ export default class CoinifyRabbit extends EventEmitter {
    * @return {Promise<amqplib.Connection>}
    * @private
    */
-  async _getConnection(): Promise<amqplib.Connection> {
+  async _getConnection(): Promise<amqplib.ChannelModel> {
     if (!this._conn) {
       if (this.isShuttingDown) {
         throw new Error('RabbitMQ module is shutting down');

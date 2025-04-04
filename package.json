@@ -19,7 +19,7 @@
     "test-integration-watch": "mocha --config .mocharc.integration.json --watch"
   },
   "dependencies": {
-    "@types/amqplib": "^0.8.2",
+    "@types/amqplib": "^0.10.7",
     "amqplib": "^0.10.7",
     "backoff": "^2.5.0",
     "console-log-level": "^1.4.1",

@@ -135,7 +135,7 @@ export default class CoinifyRabbit extends EventEmitter {
       queueOptions.autoDelete = true;
     }
 
-    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true) {
+    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true && queueOptions.exclusive !== true) {
       queueOptions.arguments = {
         ...queueOptions?.arguments,
         'x-queue-type': 'quorum'
@@ -232,7 +232,7 @@ export default class CoinifyRabbit extends EventEmitter {
       queueOptions.autoDelete = true;
     }
 
-    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true) {
+    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true && queueOptions.exclusive !== true) {
       queueOptions.arguments = {
         ...queueOptions?.arguments,
         'x-queue-type': 'quorum'
@@ -280,7 +280,7 @@ export default class CoinifyRabbit extends EventEmitter {
     this.logger.trace({ queueName }, 'registerFailedMessageConsumer()');
 
     const queueOptions = { ...options?.queue };
-    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true) {
+    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true && queueOptions.exclusive !== true) {
       queueOptions.arguments = {
         ...queueOptions?.arguments,
         'x-queue-type': 'quorum'
@@ -963,7 +963,7 @@ export default class CoinifyRabbit extends EventEmitter {
       messageTtl: delayMs
     });
 
-    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true) {
+    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true && queueOptions.exclusive !== true) {
       queueOptions.arguments = {
         ...queueOptions?.arguments,
         'x-queue-type': 'quorum'
@@ -1004,7 +1004,7 @@ export default class CoinifyRabbit extends EventEmitter {
       messageTtl: delayMillis
     };
 
-    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true) {
+    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true && queueOptions.exclusive !== true) {
       queueOptions.arguments = {
         ...queueOptions?.arguments,
         'x-queue-type': 'quorum'
@@ -1032,7 +1032,7 @@ export default class CoinifyRabbit extends EventEmitter {
     await channel.assertExchange(deadLetterExchangeName, 'fanout', options?.exchange);
 
     const queueOptions = { ...options?.queue };
-    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true) {
+    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true && queueOptions.exclusive !== true) {
       queueOptions.arguments = {
         ...queueOptions?.arguments,
         'x-queue-type': 'quorum'

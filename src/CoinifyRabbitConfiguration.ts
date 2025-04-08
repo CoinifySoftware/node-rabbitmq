@@ -28,6 +28,7 @@ export default interface CoinifyRabbitConfiguration {
     retryPrefix: string;
     delayedTaskPrefix: string;
     failed: string;
+    useQuorumQueues?: boolean;
   };
   publish: {
     persistentMessages: boolean;

@@ -134,6 +134,14 @@ export default class CoinifyRabbit extends EventEmitter {
     if (uniqueQueue) {
       queueOptions.autoDelete = true;
     }
+
+    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true && queueOptions.exclusive !== true) {
+      queueOptions.arguments = {
+        ...queueOptions?.arguments,
+        'x-queue-type': 'quorum'
+      };
+    }
+
     const q = await channel.assertQueue(eventQueueName, queueOptions);
     await channel.bindQueue(q.queue, exchangeName, eventKey);
 
@@ -223,6 +231,13 @@ export default class CoinifyRabbit extends EventEmitter {
     if (uniqueQueue) {
       queueOptions.autoDelete = true;
     }
+
+    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true && queueOptions.exclusive !== true) {
+      queueOptions.arguments = {
+        ...queueOptions?.arguments,
+        'x-queue-type': 'quorum'
+      };
+    }
     const q = await channel.assertQueue(taskQueueName, queueOptions);
     await channel.bindQueue(q.queue, exchangeName, fullTaskName);
 
@@ -250,7 +265,7 @@ export default class CoinifyRabbit extends EventEmitter {
    * @param {object} options.queue Object of options to pass to amqplib's assertQueue()
    * @param {boolean} options.queue.durable If true, the queue will survive broker restarts,
    *                                        modulo the effects of exclusive and autoDelete;
-   *                                        This defaults to true if not supplied, unlike the others
+   *                                        This defaults to true if not supplied
    * @param {boolean} options.queue.autoDelete If true, the queue will be destroyed once the number of consumers drops
    *                                           to zero. Defaults to false.
    * @param {number} options.consumer.prefetch Sets the limit for number of unacknowledged messages for this consumer.
@@ -264,7 +279,14 @@ export default class CoinifyRabbit extends EventEmitter {
     const queueName = this.config.queues.failed;
     this.logger.trace({ queueName }, 'registerFailedMessageConsumer()');
 
-    const q = await channel.assertQueue(queueName, options?.queue);
+    const queueOptions = { ...options?.queue };
+    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true && queueOptions.exclusive !== true) {
+      queueOptions.arguments = {
+        ...queueOptions?.arguments,
+        'x-queue-type': 'quorum'
+      };
+    }
+    const q = await channel.assertQueue(queueName, queueOptions);
     const prefetch = options?.consumer?.prefetch ?? this.config.consumer.prefetch;
     await channel.prefetch(prefetch, false);
     const { consumerTag } = await channel.consume(q.queue,
@@ -281,7 +303,7 @@ export default class CoinifyRabbit extends EventEmitter {
     await this._getConnection();
   }
 
-  private _conn?: amqplib.Connection;
+  private _conn?: amqplib.ChannelModel;
   private _getConnectionPromise?: Promise<void>;
 
   /**
@@ -289,7 +311,7 @@ export default class CoinifyRabbit extends EventEmitter {
    * @return {Promise<amqplib.Connection>}
    * @private
    */
-  async _getConnection(): Promise<amqplib.Connection> {
+  async _getConnection(): Promise<amqplib.ChannelModel> {
     if (!this._conn) {
       if (this.isShuttingDown) {
         throw new Error('RabbitMQ module is shutting down');
@@ -940,6 +962,14 @@ export default class CoinifyRabbit extends EventEmitter {
       deadLetterExchange: '', // An empty string here means that this is going to the global direct exchange
       messageTtl: delayMs
     });
+
+    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true && queueOptions.exclusive !== true) {
+      queueOptions.arguments = {
+        ...queueOptions?.arguments,
+        'x-queue-type': 'quorum'
+      };
+    }
+
     const q = await channel.assertQueue(retryQueueName, queueOptions);
     await channel.bindQueue(q.queue, retryExchangeName, q.queue);
 
@@ -973,6 +1003,13 @@ export default class CoinifyRabbit extends EventEmitter {
       deadLetterExchange: tasksExchangeName,
       messageTtl: delayMillis
     };
+
+    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true && queueOptions.exclusive !== true) {
+      queueOptions.arguments = {
+        ...queueOptions?.arguments,
+        'x-queue-type': 'quorum'
+      };
+    }
     const q = await channel.assertQueue(delayedQueueName, queueOptions);
     await channel.bindQueue(q.queue, delayedExchangeName, q.queue);
 
@@ -994,7 +1031,14 @@ export default class CoinifyRabbit extends EventEmitter {
 
     await channel.assertExchange(deadLetterExchangeName, 'fanout', options?.exchange);
 
-    const q = await channel.assertQueue(deadLetterQueueName, options?.queue);
+    const queueOptions = { ...options?.queue };
+    if (this.config.queues.useQuorumQueues && queueOptions.durable !== false && queueOptions.autoDelete !== true && queueOptions.exclusive !== true) {
+      queueOptions.arguments = {
+        ...queueOptions?.arguments,
+        'x-queue-type': 'quorum'
+      };
+    }
+    const q = await channel.assertQueue(deadLetterQueueName, queueOptions);
     // TODO Does '' below work?
     await channel.bindQueue(q.queue, deadLetterExchangeName, '');
 
